@@ -416,6 +416,7 @@ def api_status():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("DASHBOARD_PORT", 5000))
+    # Railway injects PORT; fall back to DASHBOARD_PORT, then 5000
+    port = int(os.environ.get("PORT", os.environ.get("DASHBOARD_PORT", 5000)))
     print(f"\n  VusiD Dashboard running at http://0.0.0.0:{port}\n")
     app.run(host="0.0.0.0", port=port, debug=False)

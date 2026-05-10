@@ -44,9 +44,12 @@ def run_process(name: str, script: str):
 
         log.info(f"[{name}] Starting {script}...")
         try:
+            import os as _os
+            env = _os.environ.copy()
             proc = subprocess.Popen(
                 [PYTHON, str(BOT_DIR / script)],
                 cwd=str(BOT_DIR),
+                env=env,
             )
             log.info(f"[{name}] Running (PID {proc.pid})")
             proc.wait()
