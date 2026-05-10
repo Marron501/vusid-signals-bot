@@ -5,3 +5,7 @@ builder = "nixpacks"
 startCommand = "python watchdog.py"
 restartPolicyType = "always"
 restartPolicyMaxRetries = 100
+
+[[services]]
+name = "dashboard"
+internalPort = 5000
