@@ -1,0 +1,21 @@
+# Secrets — never commit these
+.env
+
+# Logs
+*.log
+
+# State files
+state.json
+trade_history.json
+trade_stats.json
+leader_positions.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+env/
+
+# macOS
+.DS_Store
