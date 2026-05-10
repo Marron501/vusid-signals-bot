@@ -1,12 +1,14 @@
 """
 Discord Signal Listener.
-Connects to Discord, listens to #daily-signals for messages from CopyBot#8959,
-parses trade signals, and executes them via TradeExecutor.
+Connects to Discord, listens to #daily-signals for trade signals,
+applies 70% win rate filter, executes trades, and sends DM alerts.
 """
 import logging
 import re
 import time
+import json
 from decimal import Decimal
+from pathlib import Path
 
 import discord
 
@@ -16,22 +18,50 @@ from trade_optimizer import TradeOptimizer
 
 logger = logging.getLogger(__name__)
 
+STATS_FILE = Path(__file__).parent / "trade_stats.json"
+
+# Channel historical win rate (38W/6L from vusidesigner's community)
+# Used as fallback when bot has less than 5 trades of its own
+CHANNEL_WINS = 38
+CHANNEL_TOTAL = 44
+MIN_WIN_RATE = 0.70  # 70%
+
+
+# ─────────────────────────────────────────────
+# Win Rate Filter
+# ─────────────────────────────────────────────
+
+def get_win_rate() -> tuple:
+    """
+    Returns (win_rate, wins, total) based on bot's own history,
+    falling back to channel's known historical rate if < 5 trades.
+    """
+    if STATS_FILE.exists():
+        try:
+            with open(STATS_FILE) as f:
+                stats = json.load(f)
+            total = stats.get("total_trades", 0)
+            wins = stats.get("wins", 0)
+            if total >= 5:
+                return (wins / total, wins, total)
+        except Exception:
+            pass
+
+    # Fallback: use channel's known win rate
+    return (CHANNEL_WINS / CHANNEL_TOTAL, CHANNEL_WINS, CHANNEL_TOTAL)
+
+
+def passes_win_rate_filter() -> tuple:
+    """Returns (passed: bool, win_rate: float, wins: int, total: int)"""
+    win_rate, wins, total = get_win_rate()
+    return (win_rate >= MIN_WIN_RATE, win_rate, wins, total)
+
+
+# ─────────────────────────────────────────────
+# Signal Parser
+# ─────────────────────────────────────────────
 
 class SignalParser:
-    """
-    Parses trade signals from CopyBot#8959 messages.
-
-    Supports common signal formats:
-        BUY BTCUSDT @ 65000 | SL 64000 | TP 67000 | LEV 10x
-        SELL ETHUSDT 3500 SL 3600 TP 3200 10x
-        LONG BTC 65000 leverage 10
-        SHORT ETH 3500 lev 5x
-        CLOSE BTCUSDT
-        CLOSE ALL
-        TP HIT BTCUSDT
-    """
-
-    # Patterns for signal parsing
     SIDE_MAP = {
         "buy": "Buy", "long": "Buy", "bullish": "Buy",
         "sell": "Sell", "short": "Sell", "bearish": "Sell",
@@ -56,24 +86,8 @@ class SignalParser:
 
     @classmethod
     def parse(cls, message: str):
-        """
-        Parse a signal message and return structured trade data.
-
-        Returns:
-            {
-                "action": "open" | "close" | "close_all",
-                "symbol": "BTCUSDT",
-                "side": "Buy" | "Sell",
-                "entry": Decimal or None,
-                "stop_loss": Decimal or None,
-                "take_profit": Decimal or None,
-                "leverage": Decimal or None,
-            }
-            or None if message isn't a valid signal.
-        """
         text = message.strip()
 
-        # Check for close signals first
         for pattern in cls.CLOSE_PATTERNS:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
@@ -87,7 +101,6 @@ class SignalParser:
                         symbol += "USDT"
                     return {"action": "close", "symbol": symbol}
 
-        # Try to parse open signal
         match = cls.SIGNAL_PATTERN.search(text)
         if not match:
             return None
@@ -110,7 +123,6 @@ class SignalParser:
             "leverage": Decimal(match.group("leverage")) if match.group("leverage") else None,
         }
 
-        # Also check for leverage anywhere in the message (e.g. "10x" standalone)
         if result["leverage"] is None:
             lev_match = re.search(r"(\d+)\s*x\b", text, re.IGNORECASE)
             if lev_match:
@@ -119,17 +131,17 @@ class SignalParser:
         return result
 
 
-class SignalExecutor:
-    """Executes parsed signals via TradeExecutor."""
+# ─────────────────────────────────────────────
+# Signal Executor
+# ─────────────────────────────────────────────
 
+class SignalExecutor:
     def __init__(self):
         self.executor = TradeExecutor()
         self.optimizer = TradeOptimizer(self.executor)
 
     def execute_signal(self, signal: dict) -> bool:
-        """Execute a parsed trade signal."""
         action = signal["action"]
-
         if action == "close_all":
             return self._close_all()
         elif action == "close":
@@ -141,22 +153,17 @@ class SignalExecutor:
     def _open(self, signal: dict) -> bool:
         symbol = signal["symbol"]
         side = signal["side"]
-
-        # Always use 5x leverage and 10% equity as configured — ignore signal's leverage
         leverage = Decimal(str(config.DEFAULT_LEVERAGE))
         equity = self.executor.get_equity()
         cost = equity * Decimal(str(config.EQUITY_FRACTION))
 
-        logger.info(f"Sizing: equity={equity:.2f} USDT, 10% = {cost:.2f} USDT, leverage={leverage}x cross")
-
-        # Set leverage and open
+        logger.info(f"Sizing: equity={equity:.2f} USDT, {config.EQUITY_FRACTION*100:.0f}% = {cost:.2f} USDT, {leverage}x cross")
         logger.info(f"SIGNAL EXECUTE: {side} {symbol} | cost={cost:.2f} USDT | {leverage}x")
 
         success = self.executor.open_position(symbol, side, cost, leverage)
         if success:
             self.optimizer.record_trade(symbol, side, "open", cost, leverage)
             logger.info(f"OPENED: {side} {symbol}")
-
             if signal.get("stop_loss"):
                 logger.info(f"  Stop Loss: {signal['stop_loss']}")
             if signal.get("take_profit"):
@@ -196,8 +203,11 @@ class SignalExecutor:
         return all_ok
 
 
+# ─────────────────────────────────────────────
+# Discord Client
+# ─────────────────────────────────────────────
+
 class DiscordSignalClient(discord.Client):
-    """Discord client that listens to #daily-signals for trade signals."""
 
     def __init__(self):
         intents = discord.Intents.default()
@@ -205,68 +215,125 @@ class DiscordSignalClient(discord.Client):
         super().__init__(intents=intents)
         self.signal_executor = SignalExecutor()
         self.signal_channel_name = config.SIGNAL_CHANNEL
-        self.signal_bot_name = config.SIGNAL_BOT_NAME
-        self.signal_bot_id = config.SIGNAL_BOT_ID
+        self.owner_id = int(config.OWNER_DISCORD_ID) if config.OWNER_DISCORD_ID else None
 
     async def on_ready(self):
         logger.info(f"Discord connected as {self.user}")
         logger.info(f"Listening for ALL signals in #{self.signal_channel_name}")
-
-        # Find and log the target channel
         for guild in self.guilds:
             for channel in guild.text_channels:
                 if channel.name == self.signal_channel_name:
                     logger.info(f"Found #{channel.name} in {guild.name} (id={channel.id})")
 
+        # Send startup DM to owner
+        await self._dm_owner(
+            "✅ **VusiD Signals Bot is ONLINE**\n"
+            f"Listening to `#{self.signal_channel_name}`\n"
+            f"Win rate filter: ≥{MIN_WIN_RATE*100:.0f}%\n"
+            f"Per trade: {float(config.EQUITY_FRACTION)*100:.0f}% equity | {config.DEFAULT_LEVERAGE}x cross"
+        )
+
     async def on_message(self, message: discord.Message):
-        # Only listen to the right channel
         if not hasattr(message.channel, "name") or message.channel.name != self.signal_channel_name:
             return
 
-        # Skip our own messages (prevent feedback loops) UNLESS
-        # we are CopyBot#8959 reading signals we posted ourselves
-        # In that case, we still want to process them
-        # So: only skip if the message is from us AND not a valid signal
         is_self = message.author == self.user
+        logger.info(f"MESSAGE from {message.author}: {message.content[:80]}")
 
-        logger.info(f"MESSAGE in #{self.signal_channel_name} from {message.author} (bot={message.author.bot}): {message.content}")
-
-        # Parse the signal
         signal = SignalParser.parse(message.content)
 
         if signal is None:
-            logger.info(f"Not a trade signal, skipping")
+            logger.info("Not a trade signal, skipping")
             return
 
-        # If the message is from ourselves and we already executed it, skip
         if is_self:
-            logger.info(f"Signal from self — skipping to prevent loop")
+            logger.info("Signal from self — skipping")
             return
 
         logger.info(f"PARSED SIGNAL: {signal}")
 
-        # Execute if auto-execute is on
-        if config.AUTO_EXECUTE:
-            success = self.signal_executor.execute_signal(signal)
-            status = "SUCCESS" if success else "FAILED"
-            logger.info(f"Signal execution: {status}")
-        else:
-            logger.info(f"AUTO_EXECUTE is off — signal logged but not executed")
+        if not config.AUTO_EXECUTE:
+            logger.info("AUTO_EXECUTE is off — signal logged but not executed")
+            return
 
+        # ── Win Rate Filter (only for open trades) ──
+        if signal["action"] == "open":
+            passed, win_rate, wins, total = passes_win_rate_filter()
+            win_pct = f"{win_rate*100:.1f}%"
+
+            if not passed:
+                msg = (
+                    f"⚠️ **Signal SKIPPED — Win Rate Too Low**\n"
+                    f"Signal: {signal['side']} {signal.get('symbol','')}\n"
+                    f"Current win rate: **{win_pct}** ({wins}/{total}) — below 70% threshold\n"
+                    f"Trade not executed."
+                )
+                logger.warning(f"Win rate {win_pct} below 70% — skipping trade")
+                await self._dm_owner(msg)
+                return
+
+            logger.info(f"Win rate check passed: {win_pct} ({wins}/{total}) ✅")
+
+            # Execute trade
+            success = self.signal_executor.execute_signal(signal)
+
+            # Build DM alert
+            if success:
+                executor = self.signal_executor.executor
+                equity = executor.get_equity()
+                mark = executor.get_mark_price(signal["symbol"])
+                msg = (
+                    f"🟢 **Trade Executed**\n"
+                    f"────────────────────\n"
+                    f"Signal: **{signal['side']} {signal['symbol']}**\n"
+                    f"Entry: `{mark}`\n"
+                    f"TP: `{signal.get('take_profit', 'N/A')}`\n"
+                    f"SL: `{signal.get('stop_loss', 'N/A')}`\n"
+                    f"Leverage: `{config.DEFAULT_LEVERAGE}x cross`\n"
+                    f"Margin: `{float(config.EQUITY_FRACTION)*100:.0f}%` of equity\n"
+                    f"Win Rate: `{win_pct}` ({wins}/{total} trades)\n"
+                    f"Equity: `{equity:.2f} USDT`"
+                )
+            else:
+                msg = (
+                    f"🔴 **Trade FAILED**\n"
+                    f"Signal: {signal['side']} {signal['symbol']}\n"
+                    f"Check Railway logs for details."
+                )
+            await self._dm_owner(msg)
+
+        else:
+            # Close signals — execute without win rate check
+            success = self.signal_executor.execute_signal(signal)
+            action = signal["action"].upper()
+            symbol = signal.get("symbol", "ALL")
+            status = "✅ Done" if success else "❌ Failed"
+            await self._dm_owner(f"🔔 **{action} {symbol}** — {status}")
+
+    async def _dm_owner(self, message: str):
+        """Send a DM to the bot owner."""
+        if not self.owner_id:
+            return
+        try:
+            user = await self.fetch_user(self.owner_id)
+            await user.send(message)
+            logger.info(f"DM sent to owner")
+        except Exception as e:
+            logger.warning(f"Could not send DM: {e}")
+
+
+# ─────────────────────────────────────────────
+# Entry Point
+# ─────────────────────────────────────────────
 
 def start_signal_listener():
-    """Start the Discord signal listener with auto-reconnect on any failure."""
     if not config.DISCORD_TOKEN:
-        logger.error("DISCORD_TOKEN not set in .env — cannot connect to Discord")
-        print("\n  ERROR: Set DISCORD_TOKEN in your .env file")
-        print("  Get your bot token from https://discord.com/developers/applications\n")
+        logger.error("DISCORD_TOKEN not set in .env")
         return
 
-    import asyncio
-
-    RECONNECT_DELAYS = [5, 10, 30, 60, 120]  # backoff steps in seconds
-
+    RECONNECT_DELAYS = [5, 10, 30, 60, 120]
     attempt = 0
+
     while True:
         try:
             logger.info(f"Starting Discord signal listener (attempt #{attempt + 1})...")
@@ -283,6 +350,5 @@ def start_signal_listener():
             attempt += 1
             continue
 
-        # Clean exit — no reconnect needed
         logger.info("Discord listener stopped cleanly.")
         break

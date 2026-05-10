@@ -17,6 +17,7 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN", "")
 SIGNAL_CHANNEL = os.getenv("SIGNAL_CHANNEL", "daily-signals")
 SIGNAL_BOT_NAME = os.getenv("SIGNAL_BOT_NAME", "CopyBot#8959")
 SIGNAL_BOT_ID = os.getenv("SIGNAL_BOT_ID", "")  # Discord user ID of CopyBot#8959
+OWNER_DISCORD_ID = os.getenv("OWNER_DISCORD_ID", "754978386669207593")  # Your Discord ID for DM alerts
 
 # --- Risk / Sizing ---
 EQUITY_FRACTION = float(os.getenv("EQUITY_FRACTION", "1.0"))
