@@ -1,10 +1,16 @@
 """
 VusiD Signals Bot — Web Dashboard
 Mobile-first dashboard showing bot status, positions, trades, signals and PnL.
-Run alongside bot.py or deploy as a separate Railway service.
+On Railway: this IS the main process. It binds to PORT immediately (satisfies
+Railway health check) and spawns bot.py as a background subprocess.
 """
 import json
 import os
+import subprocess
+import sys
+import threading
+import time
+import logging
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -20,6 +26,53 @@ app = Flask(__name__)
 CORS(app)
 
 BASE = Path(__file__).parent
+log = logging.getLogger("dashboard")
+
+# ─────────────────────────────────────────────
+# Background: spawn & watchdog bot.py
+# ─────────────────────────────────────────────
+
+def _run_bot_forever():
+    """Keep bot.py running in the background with auto-restart."""
+    restart_times = []
+    FAST_WINDOW = 60
+    MAX_FAST = 5
+    DELAY = 10
+
+    while True:
+        now = time.time()
+        restart_times = [t for t in restart_times if now - t < FAST_WINDOW]
+        if len(restart_times) >= MAX_FAST:
+            log.warning("[BOT] Crashed too fast — waiting 60s...")
+            time.sleep(60)
+            restart_times = []
+
+        log.info("[BOT] Starting bot.py...")
+        try:
+            env = os.environ.copy()
+            proc = subprocess.Popen(
+                [sys.executable, str(BASE / "bot.py")],
+                cwd=str(BASE),
+                env=env,
+            )
+            log.info(f"[BOT] Running (PID {proc.pid})")
+            proc.wait()
+            code = proc.returncode
+        except Exception as e:
+            log.error(f"[BOT] Failed to start: {e}")
+            code = -1
+
+        restart_times.append(time.time())
+        log.warning(f"[BOT] Exited (code={code}). Restarting in {DELAY}s...")
+        time.sleep(DELAY)
+
+
+def start_bot_thread():
+    t = threading.Thread(target=_run_bot_forever, daemon=True, name="bot-watchdog")
+    t.start()
+    log.info("[DASHBOARD] Bot watchdog thread started.")
+
+
 HISTORY_FILE = BASE / "trade_history.json"
 STATS_FILE   = BASE / "trade_stats.json"
 LOG_FILE     = BASE / "bot.log"
@@ -416,6 +469,15 @@ def api_status():
 
 
 if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(name)s | %(message)s",
+        handlers=[logging.StreamHandler(sys.stdout)],
+    )
+
+    # Start bot.py watchdog in background BEFORE Flask binds
+    start_bot_thread()
+
     # Railway injects PORT; fall back to DASHBOARD_PORT, then 5000
     port = int(os.environ.get("PORT", os.environ.get("DASHBOARD_PORT", 5000)))
     print(f"\n  VusiD Dashboard running at http://0.0.0.0:{port}\n")
