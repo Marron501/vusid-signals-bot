@@ -3,10 +3,12 @@ Discord Signal Listener.
 Connects to Discord, listens to #daily-signals for trade signals,
 applies 70% win rate filter, executes trades, and sends DM alerts.
 """
+import asyncio
 import logging
 import re
 import time
 import json
+from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
@@ -230,8 +232,12 @@ class DiscordSignalClient(discord.Client):
             "✅ **VusiD Signals Bot is ONLINE**\n"
             f"Listening to `#{self.signal_channel_name}`\n"
             f"Win rate filter: ≥{MIN_WIN_RATE*100:.0f}%\n"
-            f"Per trade: {float(config.EQUITY_FRACTION)*100:.0f}% equity | {config.DEFAULT_LEVERAGE}x cross"
+            f"Per trade: {float(config.EQUITY_FRACTION)*100:.0f}% equity | {config.DEFAULT_LEVERAGE}x cross\n"
+            f"📅 Daily status report scheduled at **5:00 AM** every day"
         )
+
+        # Start the 5am daily status task
+        self.loop.create_task(self._daily_status_task())
 
     async def on_message(self, message: discord.Message):
         if not hasattr(message.channel, "name") or message.channel.name != self.signal_channel_name:
@@ -309,6 +315,76 @@ class DiscordSignalClient(discord.Client):
             symbol = signal.get("symbol", "ALL")
             status = "✅ Done" if success else "❌ Failed"
             await self._dm_owner(f"🔔 **{action} {symbol}** — {status}")
+
+    async def _daily_status_task(self):
+        """Send a status DM every day at 5:00 AM (SAST = UTC+2)."""
+        logger.info("Daily 5AM status task started")
+        while not self.is_closed():
+            now = datetime.now()
+            # Calculate seconds until next 5:00 AM
+            target = now.replace(hour=5, minute=0, second=0, microsecond=0)
+            if now >= target:
+                # Already past 5am today — schedule for tomorrow
+                from datetime import timedelta
+                target += timedelta(days=1)
+            wait_seconds = (target - now).total_seconds()
+            logger.info(f"Next status DM in {wait_seconds/3600:.1f} hours (at 05:00 AM)")
+            await asyncio.sleep(wait_seconds)
+
+            try:
+                msg = await self._build_status_msg()
+                await self._dm_owner(msg)
+                logger.info("Daily 5AM status DM sent")
+            except Exception as e:
+                logger.error(f"Failed to send daily status: {e}")
+
+            # Sleep 61 seconds to avoid firing twice in the same minute
+            await asyncio.sleep(61)
+
+    async def _build_status_msg(self) -> str:
+        """Build the full status message."""
+        executor = self.signal_executor.executor
+        equity = executor.get_equity()
+        positions = executor.get_my_positions()
+        win_rate, wins, total = get_win_rate()
+
+        pos_lines = ""
+        total_pnl = Decimal("0")
+        if positions:
+            for key, pos in positions.items():
+                pnl = pos["unrealisedPnl"]
+                total_pnl += pnl
+                icon = "🟢" if pnl >= 0 else "🔴"
+                pnl_str = f"+{pnl:.2f}" if pnl >= 0 else f"{pnl:.2f}"
+                pos_lines += (
+                    f"{icon} **{pos['symbol']}** | {pos['side']} | "
+                    f"Size: {pos['size']} | Entry: {pos['avgPrice']} | "
+                    f"{pos['leverage']}x | PnL: `{pnl_str} USDT`\n"
+                )
+        else:
+            pos_lines = "_No open positions_\n"
+
+        total_pnl_str = f"+{total_pnl:.2f}" if total_pnl >= 0 else f"{total_pnl:.2f}"
+        filter_icon = "✅" if win_rate >= 0.70 else "❌"
+        filter_status = "PASSING" if win_rate >= 0.70 else "FAILING"
+        today = datetime.now().strftime("%B %d, %Y")
+
+        return (
+            f"📊 **VusiD Signals Bot — Daily Status**\n"
+            f"📅 {today} | 05:00 AM\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            "🤖 **Bot:** ONLINE on Railway\n"
+            f"📡 **Listening:** `#daily-signals`\n"
+            f"💰 **Equity:** `{equity:.2f} USDT` (LIVE)\n"
+            f"📈 **Win Rate:** `{win_rate*100:.1f}%` ({wins}/{total} trades)\n"
+            f"⚙️ **Per Trade:** `{float(config.EQUITY_FRACTION)*100:.0f}%` equity | `{config.DEFAULT_LEVERAGE}x` cross\n"
+            f"🎯 **Win Rate Filter:** `≥70%` — {filter_icon} {filter_status}\n"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📂 **Open Positions ({len(positions)})**\n"
+            f"{pos_lines}"
+            "━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"💹 **Total Unrealized PnL:** `{total_pnl_str} USDT`"
+        )
 
     async def _dm_owner(self, message: str):
         """Send a DM to the bot owner."""
