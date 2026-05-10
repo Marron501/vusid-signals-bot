@@ -87,6 +87,11 @@ STATS_FILE   = BASE / "trade_stats.json"
 LOG_FILE     = BASE / "bot.log"
 DISCORD_LOG  = BASE / "bot_discord.log"
 
+# ── Start bot thread at module level so gunicorn also picks it up ──
+logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(name)s | %(message)s",
+                    handlers=[logging.StreamHandler(sys.stdout)])
+start_bot_thread()
+
 # ─────────────────────────────────────────────
 # Data helpers
 # ─────────────────────────────────────────────
@@ -479,15 +484,6 @@ def api_status():
 
 
 if __name__ == "__main__":
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s | %(name)s | %(message)s",
-        handlers=[logging.StreamHandler(sys.stdout)],
-    )
-
-    # Start bot.py watchdog in background BEFORE Flask binds
-    start_bot_thread()
-
     # Railway injects PORT; fall back to DASHBOARD_PORT, then 5000
     port = int(os.environ.get("PORT", os.environ.get("DASHBOARD_PORT", 5000)))
     print(f"\n  VusiD Dashboard running at http://0.0.0.0:{port}\n")
