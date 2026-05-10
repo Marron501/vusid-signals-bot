@@ -2,6 +2,6 @@
 builder = "nixpacks"
 
 [deploy]
-startCommand = "gunicorn dashboard:app --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120"
+startCommand = "gunicorn dashboard:app --config gunicorn.conf.py"
 restartPolicyType = "always"
 restartPolicyMaxRetries = 100
