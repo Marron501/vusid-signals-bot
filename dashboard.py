@@ -12,18 +12,27 @@ import threading
 import time
 import logging
 from datetime import datetime
-from decimal import Decimal
 from pathlib import Path
 
 from flask import Flask, jsonify, render_template_string
 from flask_cors import CORS
 
-import config
-from trade_executor import TradeExecutor
-from signal_listener import get_win_rate
-
 app = Flask(__name__)
 CORS(app)
+
+# Lazy imports — keep them inside functions so a crash in pybit/discord
+# does NOT prevent Flask from binding to PORT on startup
+def _get_config():
+    import config
+    return config
+
+def _get_executor():
+    from trade_executor import TradeExecutor
+    return TradeExecutor()
+
+def _get_win_rate():
+    from signal_listener import get_win_rate
+    return get_win_rate()
 
 BASE = Path(__file__).parent
 log = logging.getLogger("dashboard")
@@ -84,7 +93,7 @@ DISCORD_LOG  = BASE / "bot_discord.log"
 
 def get_account():
     try:
-        ex = TradeExecutor()
+        ex = _get_executor()
         equity   = float(ex.get_equity())
         positions = ex.get_my_positions()
         pos_list  = []
@@ -106,7 +115,7 @@ def get_account():
 
 
 def get_stats():
-    win_rate, wins, total = get_win_rate()
+    win_rate, wins, total = _get_win_rate()
     losses = total - wins
     stats = {"win_rate": round(win_rate * 100, 1), "wins": wins, "losses": losses, "total": total}
     if STATS_FILE.exists():
@@ -455,6 +464,7 @@ def api_status():
     logs    = get_recent_logs()
     online  = bot_is_online()
 
+    cfg = _get_config()
     return jsonify({
         "bot_online":       online,
         "timestamp":        datetime.now().isoformat(),
@@ -462,9 +472,9 @@ def api_status():
         "stats":            stats,
         "history":          history,
         "logs":             logs,
-        "equity_fraction":  config.EQUITY_FRACTION,
-        "default_leverage": config.DEFAULT_LEVERAGE,
-        "signal_channel":   config.SIGNAL_CHANNEL,
+        "equity_fraction":  cfg.EQUITY_FRACTION,
+        "default_leverage": cfg.DEFAULT_LEVERAGE,
+        "signal_channel":   cfg.SIGNAL_CHANNEL,
     })
 
 

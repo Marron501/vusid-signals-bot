@@ -1,1 +1,1 @@
-worker: python watchdog.py
+web: python dashboard.py
