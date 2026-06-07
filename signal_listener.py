@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 BASE            = Path(__file__).parent
 
+# ── Persistent file paths (volume-aware) ──────────────────────────────────────
+from paths import SIGNALS_FILE, PROCESSED_FILE, STATS_FILE
+
 # ── SSE helper ────────────────────────────────────────────────────────────────
 
 def _push_sse(event: dict) -> None:
@@ -37,9 +40,6 @@ def _push_sse(event: dict) -> None:
         event_bus.publish(event)
     except Exception:
         pass
-STATS_FILE      = BASE / "trade_stats.json"
-SIGNALS_FILE    = BASE / "signals.json"
-PROCESSED_FILE  = BASE / "processed_signals.json"
 
 CHANNEL_WINS  = 38
 CHANNEL_TOTAL = 44

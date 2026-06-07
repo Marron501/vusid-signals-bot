@@ -17,12 +17,9 @@ import event_bus
 app = Flask(__name__)
 CORS(app)
 
-BASE         = Path(__file__).parent
-HISTORY_FILE = BASE / "trade_history.json"
-STATS_FILE   = BASE / "trade_stats.json"
-SIGNALS_FILE = BASE / "signals.json"
-LOG_FILE     = BASE / "bot.log"
-DISCORD_LOG  = BASE / "bot_discord.log"
+from paths import (SIGNALS_FILE, STATS_FILE, HISTORY_FILE,
+                   LOG_FILE, DISCORD_LOG, DATA_DIR)
+BASE = Path(__file__).parent
 
 logging.basicConfig(level=logging.INFO,
     format="%(asctime)s | %(name)s | %(message)s",
@@ -64,7 +61,9 @@ def _keepalive_loop():
 
 threading.Thread(target=_run_bot_forever, daemon=True, name="bot").start()
 threading.Thread(target=_keepalive_loop,  daemon=True, name="keepalive").start()
-log.info("[PROLIFIC] Bot + keepalive threads started")
+log.info(f"[PROLIFIC] Bot + keepalive threads started")
+log.info(f"[PROLIFIC] Data directory: {DATA_DIR}")
+log.info(f"[PROLIFIC] Signals file  : {SIGNALS_FILE}")
 
 
 # ── Data helpers ──────────────────────────────────────────────────────────────

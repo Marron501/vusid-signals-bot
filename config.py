@@ -18,6 +18,7 @@ SIGNAL_CHANNEL = os.getenv("SIGNAL_CHANNEL", "daily-signals")
 SIGNAL_BOT_NAME = os.getenv("SIGNAL_BOT_NAME", "CopyBot#8959")
 SIGNAL_BOT_ID = os.getenv("SIGNAL_BOT_ID", "")  # Discord user ID of CopyBot#8959
 OWNER_DISCORD_ID = os.getenv("OWNER_DISCORD_ID", "754978386669207593")  # Your Discord ID for DM alerts
+DM_ALERTS = os.getenv("DM_ALERTS", "true").lower() in ("true", "1", "yes")  # Set false to mute DMs
 
 # --- Risk / Sizing ---
 EQUITY_FRACTION = float(os.getenv("EQUITY_FRACTION", "1.0"))
@@ -31,7 +32,12 @@ BYBIT_MAINNET = "https://api.bybit.com"
 
 # --- Logging ---
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
-LOG_FILE = os.getenv("LOG_FILE", "bot.log")
+# LOG_FILE resolved from paths.py (volume-aware); fallback kept for manual CLI use
+try:
+    from paths import LOG_FILE as _pf
+    LOG_FILE = str(_pf)
+except Exception:
+    LOG_FILE = os.getenv("LOG_FILE", "bot.log")
 
 # --- Position mode ---
 POSITION_MODE = int(os.getenv("POSITION_MODE", "0"))  # 0 = one-way

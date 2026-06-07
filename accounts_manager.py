@@ -18,9 +18,9 @@ import uuid
 from pathlib import Path
 from typing import Optional
 
-logger = logging.getLogger(__name__)
+from paths import ACCOUNTS_FILE
 
-ACCOUNTS_FILE = Path(__file__).parent / "accounts.json"
+logger = logging.getLogger(__name__)
 
 _DEFAULTS: dict = {
     "id":              "",
