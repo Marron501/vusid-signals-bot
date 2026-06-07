@@ -59,6 +59,35 @@ class TradeExecutor:
                 return Decimal(coin["equity"])
         return Decimal("0")
 
+    def get_full_balance(self) -> dict:
+        """Get full USDT wallet breakdown: equity, available, used margin, unrealised PnL."""
+        try:
+            wallet   = self.client.get_wallet_balance(accountType="UNIFIED")
+            account  = wallet["result"]["list"][0]
+            total_eq = Decimal(account.get("totalEquity") or "0")
+            total_av = Decimal(account.get("totalAvailableBalance") or "0")
+            total_mm = Decimal(account.get("totalInitialMargin") or "0")
+            total_up = Decimal(account.get("totalPerpUPL") or "0")
+            usdt_eq  = Decimal("0")
+            usdt_av  = Decimal("0")
+            for coin in account.get("coin", []):
+                if coin["coin"] == "USDT":
+                    usdt_eq = Decimal(coin.get("equity") or "0")
+                    usdt_av = Decimal(coin.get("availableToWithdraw") or coin.get("availableToBorrow") or "0")
+                    break
+            return {
+                "equity":           float(usdt_eq),
+                "available":        float(usdt_av),
+                "used_margin":      float(total_mm),
+                "unrealised_pnl":   float(total_up),
+                "total_equity_usd": float(total_eq),
+                "error":            None,
+            }
+        except Exception as e:
+            logger.error(f"get_full_balance failed: {e}")
+            return {"equity": 0, "available": 0, "used_margin": 0,
+                    "unrealised_pnl": 0, "total_equity_usd": 0, "error": str(e)}
+
     def get_mark_price(self, symbol: str) -> Decimal:
         """Get current mark price for a symbol."""
         ticker = self.client.get_tickers(category=CATEGORY, symbol=symbol)
