@@ -128,9 +128,11 @@ def get_history(limit=30):
     except Exception: return []
 
 
-def get_signals(limit=50):
+def get_signals(limit=200, offset=0):
     if not SIGNALS_FILE.exists(): return []
-    try: return list(reversed(json.loads(SIGNALS_FILE.read_text())))[:limit]
+    try:
+        all_sigs = list(reversed(json.loads(SIGNALS_FILE.read_text())))
+        return all_sigs[offset:offset + limit]
     except Exception: return []
 
 
@@ -200,13 +202,25 @@ def api_status():
         "account":          get_primary_account(),
         "stats":            get_stats(),
         "history":          get_history(),
-        "signals":          get_signals(),
+        "signals":          get_signals(limit=200),
         "logs":             get_logs(),
         "equity_fraction":  cfg.EQUITY_FRACTION,
         "default_leverage": cfg.DEFAULT_LEVERAGE,
         "signal_channel":   cfg.SIGNAL_CHANNEL,
         "auto_execute":     cfg.AUTO_EXECUTE,
     })
+
+
+@app.route("/api/signals")
+def api_signals():
+    limit  = int(request.args.get("limit",  200))
+    offset = int(request.args.get("offset", 0))
+    sigs   = get_signals(limit=limit, offset=offset)
+    total  = 0
+    if SIGNALS_FILE.exists():
+        try: total = len(json.loads(SIGNALS_FILE.read_text()))
+        except Exception: pass
+    return jsonify({"signals": sigs, "total": total, "offset": offset, "limit": limit})
 
 
 @app.route("/api/settings", methods=["POST"])
@@ -772,15 +786,30 @@ select.inp option{background:var(--card);color:var(--text)}
 <!-- ③ SIGNALS -->
 <div class="page" id="page-signals"><div class="pad">
   <div class="card mb">
-    <div class="card-label"><span class="live-dot"></span>Live Signal Feed · Real-time</div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+    <div class="card-label"><span class="live-dot"></span>Live Signal Feed · Real-time · <span id="sg-total-lbl" style="color:var(--accent2)">0 total</span></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px">
       <div style="text-align:center"><div style="font-size:24px;font-weight:900;color:var(--green)" id="sg-exec">0</div><div style="font-size:8.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-top:3px">Executed</div></div>
       <div style="text-align:center"><div style="font-size:24px;font-weight:900;color:var(--red)" id="sg-skip">0</div><div style="font-size:8.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-top:3px">Skipped</div></div>
       <div style="text-align:center"><div style="font-size:24px;font-weight:900;color:var(--yellow)" id="sg-parse">0</div><div style="font-size:8.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-top:3px">Parse Err</div></div>
       <div style="text-align:center"><div style="font-size:24px;font-weight:900;color:var(--cyan)" id="sg-rec">0</div><div style="font-size:8.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-top:3px">Recovered</div></div>
     </div>
+    <!-- Filter pills -->
+    <div class="fpills" id="sig-filter-pills">
+      <span class="fpill active" onclick="setSigFilter('all',this)">All</span>
+      <span class="fpill" onclick="setSigFilter('executed',this)">✅ Executed</span>
+      <span class="fpill" onclick="setSigFilter('skipped',this)">⛔ Skipped</span>
+      <span class="fpill" onclick="setSigFilter('nofunds',this)">💸 No Funds</span>
+      <span class="fpill" onclick="setSigFilter('parse',this)">⚠️ Parse Err</span>
+      <span class="fpill" onclick="setSigFilter('recovered',this)">⏪ Recovered</span>
+    </div>
   </div>
   <div id="sig-list"><div class="empty"><svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.111 16.404a5.5 5.5 0 0 1 7.778 0M12 20h.01M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0M5.105 12.682a9.5 9.5 0 0 1 13.79 0"/></svg>Waiting for signals…</div></div>
+  <div id="sig-loadmore" style="display:none;margin-top:10px">
+    <button class="btn btn-ghost btn-sm" onclick="loadMoreSignals()">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:14px;height:14px;stroke-width:2.5"><polyline stroke-linecap="round" stroke-linejoin="round" points="6 9 12 15 18 9"/></svg>
+      Load older signals
+    </button>
+  </div>
 </div></div>
 
 <!-- ④ ACCOUNTS -->
@@ -992,6 +1021,9 @@ function toggleTheme() {
 /* ── State ───────────────────────────────────────────── */
 let DATA = null, countdown = 12, activeTab = 'home', allLogs = [], logFilter = 'all';
 let _accounts = [];
+let _sigFilter = 'all';
+let _sigOffset = 0;
+const _SIG_PAGE = 200;
 
 /* ── Tabs ────────────────────────────────────────────── */
 function goTab(tab) {
@@ -1036,8 +1068,13 @@ function connectSSE() {
       const entry = ev.entry;
       if (DATA) {
         DATA.signals = DATA.signals || [];
-        DATA.signals.unshift(entry);
-        if (DATA.signals.length > 50) DATA.signals.pop();
+        // avoid dupes (same msg_id already in list)
+        const dup = DATA.signals.some(x => x.msg_id && x.msg_id === entry.msg_id);
+        if (!dup) {
+          DATA.signals.unshift(entry);
+          // keep max 500 in memory
+          if (DATA.signals.length > 500) DATA.signals.length = 500;
+        }
         renderSignals();
       }
       if (activeTab !== 'signals') {
@@ -1059,7 +1096,15 @@ function connectSSE() {
 async function fetchData() {
   try {
     const r = await fetch('/api/status');
-    DATA = await r.json();
+    const fresh = await r.json();
+    // Merge: keep any SSE-pushed signals newer than what the API returned
+    if (DATA && DATA.signals && fresh.signals) {
+      const apiIds = new Set(fresh.signals.map(x => x.msg_id).filter(Boolean));
+      const liveOnly = DATA.signals.filter(x => x.msg_id && !apiIds.has(x.msg_id));
+      fresh.signals = [...liveOnly, ...fresh.signals];
+    }
+    DATA = fresh;
+    _sigOffset = 0; // reset pagination on full refresh
     render();
   } catch(e) { console.error(e); }
 }
@@ -1183,62 +1228,124 @@ function renderHistory(hist) {
 }
 
 /* ── Signals ─────────────────────────────────────────── */
+function _sigCategory(s) {
+  const act = (s.signal || {}).action || '';
+  if (act === 'parse_failed')                         return 'parse';
+  if (s.executed && s.source === 'recovery')          return 'recovered';
+  if (s.executed)                                     return 'executed';
+  if (!s.executed && s.error && s.error.includes('Insufficient')) return 'nofunds';
+  return 'skipped';
+}
+
+function setSigFilter(f, el) {
+  _sigFilter = f;
+  document.querySelectorAll('#sig-filter-pills .fpill').forEach(p => p.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderSignals();
+}
+
+async function loadMoreSignals() {
+  _sigOffset += _SIG_PAGE;
+  const r = await fetch(`/api/signals?limit=${_SIG_PAGE}&offset=${_sigOffset}`);
+  const d = await r.json();
+  if (d.signals && d.signals.length) {
+    if (!DATA) DATA = {};
+    DATA.signals = DATA.signals || [];
+    // append older signals (avoid dupes)
+    const existing = new Set(DATA.signals.map(x => x.msg_id).filter(Boolean));
+    const fresh = d.signals.filter(x => !x.msg_id || !existing.has(x.msg_id));
+    DATA.signals.push(...fresh);
+    renderSignals();
+    if (_sigOffset + _SIG_PAGE >= d.total) {
+      document.getElementById('sig-loadmore').style.display = 'none';
+    }
+  } else {
+    document.getElementById('sig-loadmore').style.display = 'none';
+  }
+}
+
+function _sigBadge(s, isNew) {
+  const act = (s.signal || {}).action || '';
+  const cat = _sigCategory(s);
+  if (cat === 'parse')     return '<span class="badge b-parse">⚠️ Parse Error</span>';
+  if (isNew && s.executed) return '<span class="badge b-new">🔵 Live</span>';
+  if (cat === 'recovered') return '<span class="badge b-rec">⏪ Recovered</span>';
+  if (cat === 'executed')  return '<span class="badge b-exec">✅ Executed</span>';
+  if (s.reason === 'AUTO_EXECUTE=off') return '<span class="badge b-pause">⏸ Paused</span>';
+  if (cat === 'nofunds')   return '<span class="badge b-nofunds">💸 No Funds</span>';
+  if (s.reason && s.reason.includes('execution_failed')) return '<span class="badge b-fail">❌ Failed</span>';
+  return '<span class="badge b-skip">⛔ Skipped</span>';
+}
+
 function renderSignals() {
-  const sigs = (DATA && DATA.signals) || [];
-  document.getElementById('sg-exec').textContent  = sigs.filter(s => s.executed).length;
-  document.getElementById('sg-parse').textContent = sigs.filter(s => s.signal && s.signal.action === 'parse_failed').length;
-  // Skipped = not executed AND not paused AND not a parse failure
-  document.getElementById('sg-skip').textContent  = sigs.filter(s =>
-    !s.executed && s.reason !== 'AUTO_EXECUTE=off' &&
-    !(s.signal && s.signal.action === 'parse_failed')).length;
-  document.getElementById('sg-rec').textContent   = sigs.filter(s => s.source === 'recovery').length;
+  const all = (DATA && DATA.signals) || [];
+
+  // Stats always from full list
+  document.getElementById('sg-exec').textContent  = all.filter(s => s.executed).length;
+  document.getElementById('sg-parse').textContent = all.filter(s => _sigCategory(s) === 'parse').length;
+  document.getElementById('sg-skip').textContent  = all.filter(s => _sigCategory(s) === 'skipped').length;
+  document.getElementById('sg-rec').textContent   = all.filter(s => s.source === 'recovery').length;
+  document.getElementById('sg-total-lbl').textContent = all.length + ' total';
+
+  // Filter
+  const sigs = _sigFilter === 'all' ? all : all.filter(s => _sigCategory(s) === _sigFilter);
+
   const sl = document.getElementById('sig-list');
-  if (!sigs.length) { sl.innerHTML = `<div class="empty"><svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.111 16.404a5.5 5.5 0 0 1 7.778 0M12 20h.01M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0M5.105 12.682a9.5 9.5 0 0 1 13.79 0"/></svg>Waiting for signals…</div>`; return; }
+  if (!sigs.length) {
+    sl.innerHTML = `<div class="empty"><svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.111 16.404a5.5 5.5 0 0 1 7.778 0M12 20h.01M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0M5.105 12.682a9.5 9.5 0 0 1 13.79 0"/></svg>${_sigFilter==='all'?'Waiting for signals…':'No signals match this filter'}</div>`;
+    return;
+  }
+
   sl.innerHTML = sigs.map((s, i) => {
     const sig  = s.signal || {};
     const act  = sig.action || '';
     const isParseFail = act === 'parse_failed';
     const sym  = isParseFail ? '⚠️ Unrecognised' : (sig.symbol || '?');
-    const side = isParseFail ? '' : (sig.side || sig.action || '?');
+    const side = isParseFail ? '' : (sig.side || (act !== 'close_all' ? act : '') || '?');
     const isRec   = s.source === 'recovery';
-    const exec    = s.executed;
-    const pause   = s.reason === 'AUTO_EXECUTE=off';
-    const noFunds = !exec && s.error && s.error.includes('Insufficient');
     const isNew   = i === 0 && (Date.now() - new Date(s.timestamp).getTime()) < 30000;
-
-    const badge =
-        isParseFail                  ? '<span class="badge b-parse">⚠️ Parse Error</span>'
-      : isNew && exec                ? '<span class="badge b-new">🔵 Live</span>'
-      : isRec && exec                ? '<span class="badge b-rec">⏪ Recovered</span>'
-      : exec                         ? '<span class="badge b-exec">✅ Executed</span>'
-      : pause                        ? '<span class="badge b-pause">⏸ Paused</span>'
-      : noFunds                      ? '<span class="badge b-nofunds">💸 No Funds</span>'
-      : !exec && s.reason && s.reason.includes('execution_failed')
-                                     ? '<span class="badge b-fail">❌ Failed</span>'
-      :                                '<span class="badge b-skip">⛔ Skipped</span>';
-
+    const badge   = _sigBadge(s, isNew);
     const sc = side==='Buy'?'var(--green)':side==='Sell'?'var(--red)':'var(--text3)';
 
-    // Error detail line
-    const errLine = (s.error && !exec)
-      ? `<div style="font-size:10px;color:var(--red);margin-top:3px;word-break:break-all">${s.error.slice(0,120)}</div>`
+    // TP/SL tags
+    let tpsl = '';
+    if (!isParseFail) {
+      const parts = [];
+      if (sig.tp)  parts.push(`<span class="tag" style="color:var(--green);background:var(--greenbg);border-color:var(--greenb)">TP ${sig.tp}</span>`);
+      if (sig.sl)  parts.push(`<span class="tag" style="color:var(--red);background:var(--redbg);border-color:var(--redb)">SL ${sig.sl}</span>`);
+      if (sig.leverage) parts.push(`<span class="tag blue">${sig.leverage}×</span>`);
+      if (parts.length) tpsl = `<div class="tags" style="margin-top:6px">${parts.join('')}</div>`;
+    }
+
+    const errLine = (s.error && !s.executed)
+      ? `<div style="font-size:10px;color:var(--red);margin-top:3px;word-break:break-all">⚠ ${s.error.slice(0,140)}</div>`
       : '';
-
-    // For parse failures show the full raw message
+    const reasonLine = (!s.executed && s.reason && !s.error)
+      ? `<div style="font-size:10px;color:var(--text3);margin-top:2px">${s.reason.slice(0,120)}</div>`
+      : '';
     const contentLine = isParseFail
-      ? `<div style="font-size:10.5px;color:var(--text2);margin-top:3px;white-space:pre-wrap;word-break:break-all;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:6px 8px">${(s.content||'').slice(0,300).replace(/</g,'&lt;')}</div>`
-      : `<div class="row-content">${(s.content||'').slice(0,90)}</div>`;
+      ? `<div style="font-size:10.5px;color:var(--text2);margin-top:3px;white-space:pre-wrap;word-break:break-all;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:6px 8px">${(s.content||'').slice(0,400).replace(/</g,'&lt;')}</div>`
+      : `<div class="row-content">${(s.content||'').slice(0,100).replace(/</g,'&lt;')}</div>`;
 
-    return `<div class="row" style="flex-direction:column;align-items:stretch;gap:6px">
+    const srcTag = s.source === 'recovery' ? ' · ⏪ recovered'
+                  : s.source === 'live'    ? ' · 🔴 live' : '';
+
+    return `<div class="row" style="flex-direction:column;align-items:stretch;gap:5px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div class="row-left">
-          <div><span class="row-sym">${sym}</span> ${side ? `<span style="font-size:11px;font-weight:800;color:${sc}">${side}</span>` : ''}</div>
-          <div class="row-meta">${new Date(s.timestamp).toLocaleString()}${isRec?' · recovered':''}${s.source==='live'?' · live':''}</div>
+          <div><span class="row-sym">${sym}</span>${side?` <span style="font-size:11px;font-weight:800;color:${sc}">${side}</span>`:''}</div>
+          <div class="row-meta">${new Date(s.timestamp).toLocaleString()}${srcTag}</div>
         </div>${badge}
       </div>
-      ${contentLine}${errLine}
+      ${contentLine}${tpsl}${errLine}${reasonLine}
     </div>`;
   }).join('');
+
+  // Show load-more if there could be older signals not yet fetched
+  const lmBtn = document.getElementById('sig-loadmore');
+  if (all.length >= _SIG_PAGE && _sigFilter === 'all') {
+    lmBtn.style.display = 'block';
+  }
 }
 
 /* ── Logs ────────────────────────────────────────────── */
@@ -1428,7 +1535,7 @@ async function closeAll() {
   toast(d.success ? '✅ All positions closed' : '❌ Some failed', d.success);
   countdown = 2;
 }
-function refreshNow() { countdown = 12; fetchData(); toast('Refreshed ✅'); }
+function refreshNow() { countdown = 12; _sigOffset = 0; fetchData(); toast('Refreshed ✅'); }
 
 /* ── Ticker ──────────────────────────────────────────── */
 function tick() {
