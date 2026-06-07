@@ -277,10 +277,12 @@ class SignalExecutor:
     RETRY_DELAY = 2  # seconds between retries
 
     def __init__(self):
-        self.executor  = TradeExecutor()
-        self.optimizer = TradeOptimizer(self.executor)
+        self.executor   = TradeExecutor()
+        self.optimizer  = TradeOptimizer(self.executor)
+        self.last_error = ""   # populated on every call; empty string = success
 
     def execute_signal(self, signal: dict) -> bool:
+        self.last_error = ""
         action = signal["action"]
         if action == "close_all":
             return self._close_all()
@@ -288,29 +290,56 @@ class SignalExecutor:
             return self._close(signal["symbol"])
         elif action == "open":
             return self._open(signal)
+        self.last_error = f"Unknown action: {action}"
         return False
 
     def _open(self, signal: dict) -> bool:
         symbol   = signal["symbol"]
         side     = signal["side"]
         leverage = Decimal(str(config.DEFAULT_LEVERAGE))
-        equity   = self.executor.get_equity()
-        cost     = equity * Decimal(str(config.EQUITY_FRACTION))
 
-        logger.info(f"Sizing: equity={equity:.2f} USDT | {config.EQUITY_FRACTION*100:.0f}% = {cost:.2f} USDT | {leverage}x cross")
-        logger.info(f"SIGNAL EXECUTE: {side} {symbol} | cost={cost:.2f} | {leverage}x")
+        try:
+            equity = self.executor.get_equity()
+        except Exception as e:
+            self.last_error = f"get_equity failed: {e}"
+            logger.error(self.last_error)
+            return False
 
+        cost = equity * Decimal(str(config.EQUITY_FRACTION))
+        logger.info(f"Sizing: equity={equity:.2f} | {config.EQUITY_FRACTION*100:.0f}% = {cost:.2f} USDT | {leverage}x")
+
+        # Pre-check: calculate qty before even attempting — gives a clear error
+        qty = self.executor.calculate_qty(symbol, cost, leverage)
+        if not qty:
+            inst = self.executor.instruments.get(symbol, {})
+            min_q = inst.get("min_qty", "?")
+            self.last_error = (
+                f"Insufficient size — equity={equity:.2f} USDT "
+                f"cost={cost:.2f} USDT min_qty={min_q} for {symbol}"
+            )
+            logger.error(f"SKIP {side} {symbol}: {self.last_error}")
+            return False
+
+        logger.info(f"SIGNAL EXECUTE: {side} {symbol} qty={qty} cost={cost:.2f} {leverage}x")
+
+        last_api_err = ""
         for attempt in range(1, self.MAX_RETRIES + 1):
-            success = self.executor.open_position(symbol, side, cost, leverage)
-            if success:
-                self.optimizer.record_trade(symbol, side, "open", cost, leverage)
-                logger.info(f"OPENED ✅ {side} {symbol} (attempt {attempt})")
-                return True
+            try:
+                ok = self.executor.open_position(symbol, side, cost, leverage)
+                if ok:
+                    self.optimizer.record_trade(symbol, side, "open", cost, leverage)
+                    logger.info(f"OPENED ✅ {side} {symbol} (attempt {attempt})")
+                    self.last_error = ""
+                    return True
+                last_api_err = "place_order returned False"
+            except Exception as e:
+                last_api_err = str(e)
+                logger.error(f"Attempt {attempt}/{self.MAX_RETRIES}: {e}")
             if attempt < self.MAX_RETRIES:
-                logger.warning(f"Retry {attempt}/{self.MAX_RETRIES} for {side} {symbol} in {self.RETRY_DELAY}s...")
                 time.sleep(self.RETRY_DELAY * attempt)
 
-        logger.error(f"FAILED ❌ {side} {symbol} after {self.MAX_RETRIES} attempts")
+        self.last_error = f"Failed after {self.MAX_RETRIES} attempts: {last_api_err}"
+        logger.error(f"FAILED ❌ {side} {symbol}: {self.last_error}")
         return False
 
     def _close(self, symbol: str) -> bool:
@@ -429,6 +458,10 @@ class DiscordSignalClient(discord.Client):
 
     # ── Signal queue ─────────────────────────
 
+    # Keywords that suggest a message might be a trading signal
+    _TRADE_KEYWORDS = ("buy", "sell", "long", "short", "close", "tp", "sl",
+                       "take profit", "stop loss", "target", "entry", "signal")
+
     async def _enqueue_message(self, msg_id: int, content: str,
                                 created_at: datetime, source: str = "live"):
         """Parse and enqueue a signal if not already processed."""
@@ -437,10 +470,27 @@ class DiscordSignalClient(discord.Client):
             return
 
         signal = SignalParser.parse(content)
+
         if signal is None:
+            # ── NEVER silently drop: if any trading keyword exists, log it
+            has_keywords = any(kw in content.lower() for kw in self._TRADE_KEYWORDS)
+            if has_keywords:
+                _mark_processed(str(msg_id))
+                entry = {
+                    "msg_id":    str(msg_id),
+                    "timestamp": created_at.isoformat() if hasattr(created_at, "isoformat") else datetime.now().isoformat(),
+                    "content":   content[:500],
+                    "signal":    {"action": "parse_failed"},
+                    "source":    source,
+                    "executed":  False,
+                    "reason":    "parse_failed — message had keywords but no pattern matched",
+                }
+                _save_signal(entry)
+                _push_sse({"type": "signal", "entry": entry})
+                logger.warning(f"PARSE_FAILED [{msg_id}] keywords found but no pattern: {content[:120]}")
             return
 
-        # Age check (don't execute stale signals)
+        # Age check (don't execute stale recovery signals)
         if source == "recovery":
             now = datetime.now(timezone.utc)
             if created_at.tzinfo is None:
@@ -460,7 +510,11 @@ class DiscordSignalClient(discord.Client):
         })
 
     async def _signal_worker(self):
-        """Process signals from the queue one at a time."""
+        """
+        Process signals from the queue one at a time.
+        GUARANTEE: every item that reaches this worker is saved to signals.json,
+        even if an unexpected exception occurs mid-processing.
+        """
         logger.info("Signal worker started")
         while not self.is_closed():
             try:
@@ -484,55 +538,80 @@ class DiscordSignalClient(discord.Client):
             log_entry = {
                 "msg_id":    str(msg_id),
                 "timestamp": datetime.now().isoformat(),
-                "content":   content[:200],
+                "content":   content[:500],   # store full content so dashboard can show it
                 "signal":    {k: str(v) for k, v in signal.items()},
                 "source":    source,
                 "executed":  False,
                 "reason":    "",
+                "error":     "",
             }
 
-            if not config.AUTO_EXECUTE:
-                log_entry["reason"] = "AUTO_EXECUTE=off"
-                logger.info("AUTO_EXECUTE off — signal logged but not executed")
-                _save_signal(log_entry)
-                self._signal_queue.task_done()
-                continue
+            _entry_saved = False  # guard: ensure we save exactly once
 
-            # Win rate filter (open signals only)
-            if signal["action"] == "open":
-                passed, win_rate, wins, total = passes_win_rate_filter()
-                win_pct = f"{win_rate*100:.1f}%"
-
-                if not passed:
-                    reason = f"Win rate {win_pct} below 70%"
-                    log_entry["reason"] = reason
-                    logger.warning(f"SKIP: {reason}")
-                    await self._dm_owner(
-                        f"⚠️ **Signal SKIPPED**\n"
-                        f"Signal: {signal['side']} {signal.get('symbol','')}\n"
-                        f"Win rate: **{win_pct}** ({wins}/{total}) < 70%"
-                    )
+            try:
+                # ── AUTO_EXECUTE gate ─────────────────────────────────────
+                if not config.AUTO_EXECUTE:
+                    log_entry["reason"] = "AUTO_EXECUTE=off"
+                    logger.info("AUTO_EXECUTE off — signal logged, not executed")
                     _save_signal(log_entry)
-                    self._signal_queue.task_done()
+                    _entry_saved = True
+                    _push_sse({"type": "signal", "entry": log_entry})
                     continue
 
-                logger.info(f"Win rate: {win_pct} ✅ — executing")
+                # ── Win rate filter (open signals only) ───────────────────
+                if signal["action"] == "open":
+                    passed, win_rate, wins, total = passes_win_rate_filter()
+                    win_pct = f"{win_rate*100:.1f}%"
 
-            # Execute
-            try:
-                success = await asyncio.get_event_loop().run_in_executor(
-                    None, self.signal_executor.execute_signal, signal
-                )
-            except Exception as e:
-                success = False
-                logger.error(f"Execution error: {e}")
+                    if not passed:
+                        reason = f"Win rate {win_pct} below 70% ({wins}/{total})"
+                        log_entry["reason"] = reason
+                        logger.warning(f"SKIP: {reason}")
+                        _save_signal(log_entry)
+                        _entry_saved = True
+                        _push_sse({"type": "signal", "entry": log_entry})
+                        await self._dm_owner(
+                            f"⚠️ **Signal SKIPPED** — Win rate {win_pct} < 70%\n"
+                            f"Signal: {signal['side']} {signal.get('symbol','')}\n"
+                            f"Stats: {wins}W / {total-wins}L of {total}"
+                        )
+                        continue
 
-            log_entry["executed"] = success
-            log_entry["reason"]   = "success" if success else "execution_failed"
-            _save_signal(log_entry)
+                    logger.info(f"Win rate {win_pct} ✅ — executing")
 
-            # Push real-time signal update to dashboard
-            _push_sse({"type": "signal", "entry": log_entry})
+                # ── Execute ───────────────────────────────────────────────
+                exec_error = ""
+                try:
+                    success = await asyncio.get_event_loop().run_in_executor(
+                        None, self.signal_executor.execute_signal, signal
+                    )
+                    exec_error = self.signal_executor.last_error
+                except Exception as e:
+                    success   = False
+                    exec_error = str(e)
+                    logger.error(f"Execution exception: {e}")
+
+                log_entry["executed"] = success
+                log_entry["error"]    = exec_error
+                if success:
+                    log_entry["reason"] = "success"
+                else:
+                    log_entry["reason"] = f"execution_failed: {exec_error}" if exec_error else "execution_failed"
+
+                _save_signal(log_entry)
+                _entry_saved = True
+                _push_sse({"type": "signal", "entry": log_entry})
+
+            except Exception as worker_exc:
+                # ── Catch-all: signal must NEVER silently disappear ───────
+                logger.error(f"WORKER EXCEPTION [{msg_id}]: {worker_exc}", exc_info=True)
+                if not _entry_saved:
+                    log_entry["reason"] = f"worker_exception: {worker_exc}"
+                    try:
+                        _save_signal(log_entry)
+                        _push_sse({"type": "signal", "entry": log_entry})
+                    except Exception:
+                        pass
 
             # Broadcast to additional accounts (non-blocking background thread)
             if success and signal["action"] == "open":

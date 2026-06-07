@@ -527,12 +527,15 @@ button,input,select{font-family:inherit}
   text-transform:uppercase;letter-spacing:.2px;white-space:nowrap;flex-shrink:0}
 .b-exec{background:var(--greenbg);color:var(--green);border:1px solid var(--greenb)}
 .b-skip{background:var(--redbg);color:var(--red);border:1px solid var(--redb)}
+.b-fail{background:var(--redbg);color:var(--red);border:1px solid var(--redb)}
 .b-rec{background:var(--cyanbg);color:var(--cyan);border:1px solid rgba(6,182,212,.3)}
 .b-pause{background:var(--yellowbg);color:var(--yellow);border:1px solid rgba(245,158,11,.25)}
 .b-open{background:var(--accentbg);color:var(--accent2);border:1px solid var(--accentbrd)}
 .b-close{background:var(--card2);color:var(--text3);border:1px solid var(--border)}
 .b-new{background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(6,182,212,.2));
   color:var(--cyan);border:1px solid rgba(6,182,212,.4);animation:glow 1.5s ease 4}
+.b-parse{background:rgba(245,158,11,.12);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
+.b-nofunds{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.3)}
 @keyframes glow{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px rgba(6,182,212,.5)}}
 .live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;
   background:var(--green);margin-right:5px;box-shadow:0 0 6px var(--green);animation:pulse 2s infinite}
@@ -770,10 +773,11 @@ select.inp option{background:var(--card);color:var(--text)}
 <div class="page" id="page-signals"><div class="pad">
   <div class="card mb">
     <div class="card-label"><span class="live-dot"></span>Live Signal Feed · Real-time</div>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
-      <div style="text-align:center"><div style="font-size:28px;font-weight:900;color:var(--green)" id="sg-exec">0</div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-top:3px">Executed</div></div>
-      <div style="text-align:center"><div style="font-size:28px;font-weight:900;color:var(--red)" id="sg-skip">0</div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-top:3px">Skipped</div></div>
-      <div style="text-align:center"><div style="font-size:28px;font-weight:900;color:var(--cyan)" id="sg-rec">0</div><div style="font-size:9px;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-top:3px">Recovered</div></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+      <div style="text-align:center"><div style="font-size:24px;font-weight:900;color:var(--green)" id="sg-exec">0</div><div style="font-size:8.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-top:3px">Executed</div></div>
+      <div style="text-align:center"><div style="font-size:24px;font-weight:900;color:var(--red)" id="sg-skip">0</div><div style="font-size:8.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-top:3px">Skipped</div></div>
+      <div style="text-align:center"><div style="font-size:24px;font-weight:900;color:var(--yellow)" id="sg-parse">0</div><div style="font-size:8.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-top:3px">Parse Err</div></div>
+      <div style="text-align:center"><div style="font-size:24px;font-weight:900;color:var(--cyan)" id="sg-rec">0</div><div style="font-size:8.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-top:3px">Recovered</div></div>
     </div>
   </div>
   <div id="sig-list"><div class="empty"><svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.111 16.404a5.5 5.5 0 0 1 7.778 0M12 20h.01M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0M5.105 12.682a9.5 9.5 0 0 1 13.79 0"/></svg>Waiting for signals…</div></div>
@@ -1181,27 +1185,58 @@ function renderHistory(hist) {
 /* ── Signals ─────────────────────────────────────────── */
 function renderSignals() {
   const sigs = (DATA && DATA.signals) || [];
-  document.getElementById('sg-exec').textContent = sigs.filter(s => s.executed).length;
-  document.getElementById('sg-skip').textContent = sigs.filter(s => !s.executed && s.reason !== 'AUTO_EXECUTE=off').length;
-  document.getElementById('sg-rec').textContent  = sigs.filter(s => s.source === 'recovery').length;
+  document.getElementById('sg-exec').textContent  = sigs.filter(s => s.executed).length;
+  document.getElementById('sg-parse').textContent = sigs.filter(s => s.signal && s.signal.action === 'parse_failed').length;
+  // Skipped = not executed AND not paused AND not a parse failure
+  document.getElementById('sg-skip').textContent  = sigs.filter(s =>
+    !s.executed && s.reason !== 'AUTO_EXECUTE=off' &&
+    !(s.signal && s.signal.action === 'parse_failed')).length;
+  document.getElementById('sg-rec').textContent   = sigs.filter(s => s.source === 'recovery').length;
   const sl = document.getElementById('sig-list');
   if (!sigs.length) { sl.innerHTML = `<div class="empty"><svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.111 16.404a5.5 5.5 0 0 1 7.778 0M12 20h.01M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0M5.105 12.682a9.5 9.5 0 0 1 13.79 0"/></svg>Waiting for signals…</div>`; return; }
   sl.innerHTML = sigs.map((s, i) => {
-    const sig = s.signal || {}, sym = sig.symbol || '?', side = sig.side || sig.action || '?';
-    const isRec = s.source === 'recovery', exec = s.executed, pause = s.reason === 'AUTO_EXECUTE=off';
-    const isNew = i === 0 && (Date.now() - new Date(s.timestamp).getTime()) < 30000;
-    const badge = isNew && exec  ? '<span class="badge b-new">🔵 Live</span>'
-                : isRec && exec  ? '<span class="badge b-rec">⏪ Recovered</span>'
-                : exec           ? '<span class="badge b-exec">✅ Executed</span>'
-                : pause          ? '<span class="badge b-pause">⏸ Paused</span>'
-                :                  '<span class="badge b-skip">⛔ Skipped</span>';
+    const sig  = s.signal || {};
+    const act  = sig.action || '';
+    const isParseFail = act === 'parse_failed';
+    const sym  = isParseFail ? '⚠️ Unrecognised' : (sig.symbol || '?');
+    const side = isParseFail ? '' : (sig.side || sig.action || '?');
+    const isRec   = s.source === 'recovery';
+    const exec    = s.executed;
+    const pause   = s.reason === 'AUTO_EXECUTE=off';
+    const noFunds = !exec && s.error && s.error.includes('Insufficient');
+    const isNew   = i === 0 && (Date.now() - new Date(s.timestamp).getTime()) < 30000;
+
+    const badge =
+        isParseFail                  ? '<span class="badge b-parse">⚠️ Parse Error</span>'
+      : isNew && exec                ? '<span class="badge b-new">🔵 Live</span>'
+      : isRec && exec                ? '<span class="badge b-rec">⏪ Recovered</span>'
+      : exec                         ? '<span class="badge b-exec">✅ Executed</span>'
+      : pause                        ? '<span class="badge b-pause">⏸ Paused</span>'
+      : noFunds                      ? '<span class="badge b-nofunds">💸 No Funds</span>'
+      : !exec && s.reason && s.reason.includes('execution_failed')
+                                     ? '<span class="badge b-fail">❌ Failed</span>'
+      :                                '<span class="badge b-skip">⛔ Skipped</span>';
+
     const sc = side==='Buy'?'var(--green)':side==='Sell'?'var(--red)':'var(--text3)';
-    return `<div class="row">
-      <div class="row-left">
-        <div><span class="row-sym">${sym}</span> <span style="font-size:11px;font-weight:800;color:${sc}">${side}</span></div>
-        <div class="row-meta">${new Date(s.timestamp).toLocaleString()}${isRec?' · recovered':''}</div>
-        <div class="row-content">${(s.content||'').slice(0,90)}</div>
-      </div>${badge}
+
+    // Error detail line
+    const errLine = (s.error && !exec)
+      ? `<div style="font-size:10px;color:var(--red);margin-top:3px;word-break:break-all">${s.error.slice(0,120)}</div>`
+      : '';
+
+    // For parse failures show the full raw message
+    const contentLine = isParseFail
+      ? `<div style="font-size:10.5px;color:var(--text2);margin-top:3px;white-space:pre-wrap;word-break:break-all;background:var(--card2);border:1px solid var(--border);border-radius:6px;padding:6px 8px">${(s.content||'').slice(0,300).replace(/</g,'&lt;')}</div>`
+      : `<div class="row-content">${(s.content||'').slice(0,90)}</div>`;
+
+    return `<div class="row" style="flex-direction:column;align-items:stretch;gap:6px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="row-left">
+          <div><span class="row-sym">${sym}</span> ${side ? `<span style="font-size:11px;font-weight:800;color:${sc}">${side}</span>` : ''}</div>
+          <div class="row-meta">${new Date(s.timestamp).toLocaleString()}${isRec?' · recovered':''}${s.source==='live'?' · live':''}</div>
+        </div>${badge}
+      </div>
+      ${contentLine}${errLine}
     </div>`;
   }).join('');
 }
