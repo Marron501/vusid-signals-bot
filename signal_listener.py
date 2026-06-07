@@ -12,6 +12,7 @@ import asyncio
 import json
 import logging
 import re
+import threading
 import time
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
@@ -26,6 +27,16 @@ from trade_optimizer import TradeOptimizer
 logger = logging.getLogger(__name__)
 
 BASE            = Path(__file__).parent
+
+# ── SSE helper ────────────────────────────────────────────────────────────────
+
+def _push_sse(event: dict) -> None:
+    """Push a real-time event to all dashboard SSE subscribers (best-effort)."""
+    try:
+        import event_bus
+        event_bus.publish(event)
+    except Exception:
+        pass
 STATS_FILE      = BASE / "trade_stats.json"
 SIGNALS_FILE    = BASE / "signals.json"
 PROCESSED_FILE  = BASE / "processed_signals.json"
@@ -193,6 +204,74 @@ class SignalParser:
 # Signal Executor (with retry)
 # ─────────────────────────────────────────────
 
+def _broadcast_to_additional_accounts(signal: dict) -> None:
+    """
+    Execute the signal on every additional account stored in accounts.json.
+    Each account applies its own equity_fraction and leverage.
+    Runs in a background thread — never blocks the main signal queue.
+    """
+    try:
+        from accounts_manager import get_enabled_accounts
+        accounts = get_enabled_accounts()
+        if not accounts:
+            return
+        logger.info(f"[multi-account] Broadcasting to {len(accounts)} additional account(s)")
+        for acc in accounts:
+            try:
+                ex       = TradeExecutor(api_key=acc["api_key"], api_secret=acc["api_secret"],
+                                         testnet=acc.get("testnet", False))
+                eq_frac  = Decimal(str(acc.get("equity_fraction", config.EQUITY_FRACTION)))
+                lev      = Decimal(str(acc.get("leverage",        config.DEFAULT_LEVERAGE)))
+                equity   = ex.get_equity()
+                cost     = equity * eq_frac
+                name     = acc.get("name", acc["id"])
+                logger.info(f"[{name}] equity={equity:.2f} | {float(eq_frac)*100:.0f}% = {cost:.2f} USDT | {lev}x")
+                for attempt in range(1, 4):
+                    if ex.open_position(signal["symbol"], signal["side"], cost, lev):
+                        logger.info(f"[{name}] ✅ OPENED {signal['side']} {signal['symbol']}")
+                        _push_sse({"type": "account_trade", "account": name,
+                                   "symbol": signal["symbol"], "side": signal["side"],
+                                   "status": "opened"})
+                        break
+                    if attempt < 3:
+                        time.sleep(attempt * 2)
+                else:
+                    logger.error(f"[{name}] ❌ FAILED {signal['side']} {signal['symbol']} after 3 attempts")
+                    _push_sse({"type": "account_trade", "account": name,
+                               "symbol": signal["symbol"], "side": signal["side"],
+                               "status": "failed"})
+            except Exception as e:
+                logger.error(f"[{acc.get('name', acc['id'])}] broadcast error: {e}")
+    except Exception as e:
+        logger.error(f"[multi-account] broadcast failed: {e}")
+
+
+def _broadcast_close_to_additional_accounts(signal: dict) -> None:
+    """Close position on all additional accounts."""
+    try:
+        from accounts_manager import get_enabled_accounts
+        for acc in get_enabled_accounts():
+            try:
+                ex   = TradeExecutor(api_key=acc["api_key"], api_secret=acc["api_secret"],
+                                     testnet=acc.get("testnet", False))
+                name = acc.get("name", acc["id"])
+                if signal["action"] == "close_all":
+                    positions = ex.get_my_positions()
+                    for key, pos in positions.items():
+                        ex.close_position(pos["symbol"], pos["side"])
+                        logger.info(f"[{name}] ✅ CLOSED {pos['side']} {pos['symbol']}")
+                elif signal["action"] == "close":
+                    positions = ex.get_my_positions()
+                    for key, pos in positions.items():
+                        if pos["symbol"] == signal["symbol"]:
+                            ex.close_position(pos["symbol"], pos["side"])
+                            logger.info(f"[{name}] ✅ CLOSED {pos['side']} {pos['symbol']}")
+            except Exception as e:
+                logger.error(f"[{acc.get('name', acc['id'])}] close error: {e}")
+    except Exception as e:
+        logger.error(f"[multi-account] close broadcast failed: {e}")
+
+
 class SignalExecutor:
     MAX_RETRIES = 3
     RETRY_DELAY = 2  # seconds between retries
@@ -339,6 +418,12 @@ class DiscordSignalClient(discord.Client):
             return
 
         logger.info(f"MSG [{message.id}] {message.author}: {message.content[:120]}")
+
+        # Push raw message to dashboard immediately (before parse/execute)
+        _push_sse({"type": "message", "id": str(message.id),
+                   "author": str(message.author), "content": message.content[:300],
+                   "ts": message.created_at.isoformat()})
+
         await self._enqueue_message(message.id, message.content,
                                     message.created_at, source="live")
 
@@ -445,6 +530,21 @@ class DiscordSignalClient(discord.Client):
             log_entry["executed"] = success
             log_entry["reason"]   = "success" if success else "execution_failed"
             _save_signal(log_entry)
+
+            # Push real-time signal update to dashboard
+            _push_sse({"type": "signal", "entry": log_entry})
+
+            # Broadcast to additional accounts (non-blocking background thread)
+            if success and signal["action"] == "open":
+                threading.Thread(
+                    target=_broadcast_to_additional_accounts,
+                    args=(signal,), daemon=True, name="multi-acct-open"
+                ).start()
+            elif success and signal["action"] in ("close", "close_all"):
+                threading.Thread(
+                    target=_broadcast_close_to_additional_accounts,
+                    args=(signal,), daemon=True, name="multi-acct-close"
+                ).start()
 
             # DM alert
             if signal["action"] == "open":

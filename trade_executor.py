@@ -17,18 +17,27 @@ CATEGORY = "linear"
 
 
 class TradeExecutor:
-    def __init__(self):
-        if not config.API_KEY or not config.API_SECRET:
-            raise ValueError("BYBIT_API_KEY and BYBIT_API_SECRET must be set in .env")
+    def __init__(self, api_key: str = None, api_secret: str = None, testnet: bool = None):
+        """
+        Initialise executor.  If api_key / api_secret are omitted the values
+        from config (env vars) are used — preserving full backward compatibility.
+        Pass them explicitly when managing multiple trading accounts.
+        """
+        key    = api_key    if api_key    else config.API_KEY
+        secret = api_secret if api_secret else config.API_SECRET
+        demo   = testnet    if testnet is not None else config.USE_TESTNET
+
+        if not key or not secret:
+            raise ValueError("BYBIT_API_KEY and BYBIT_API_SECRET must be set")
 
         self.client = HTTP(
-            api_key=config.API_KEY,
-            api_secret=config.API_SECRET,
+            api_key=key,
+            api_secret=secret,
             testnet=False,
-            demo=config.USE_TESTNET,
+            demo=demo,
         )
-        mode = "DEMO" if config.USE_TESTNET else "LIVE"
-        logger.info(f"Trade executor initialized in {mode} mode")
+        mode = "DEMO" if demo else "LIVE"
+        logger.info(f"Trade executor initialised in {mode} mode")
         self.instruments: dict[str, dict] = {}
         self._load_instruments()
 
