@@ -298,6 +298,58 @@ def api_account_balance(acc_id):
 
 # ── Trade routes ──────────────────────────────────────────────────────────────
 
+@app.route("/api/connectivity")
+def api_connectivity():
+    """
+    Checks Bybit API reachability from this server.
+    Use to verify proxy / region config is working.
+    """
+    import time, requests as req
+    results = {}
+
+    # 1. Can we reach Bybit at all?
+    try:
+        t0 = time.time()
+        r  = req.get("https://api.bybit.com/v5/market/time", timeout=8)
+        results["bybit_reachable"] = r.status_code == 200
+        results["bybit_latency_ms"] = round((time.time() - t0) * 1000)
+        results["bybit_status_code"] = r.status_code
+    except Exception as e:
+        results["bybit_reachable"]    = False
+        results["bybit_latency_ms"]   = -1
+        results["bybit_status_code"]  = 0
+        results["bybit_error"]        = str(e)[:120]
+
+    # 2. Try authenticated balance call
+    try:
+        ex  = _executor()
+        bal = ex.get_full_balance()
+        results["auth_ok"]    = bal.get("error") is None
+        results["equity"]     = bal.get("equity", 0)
+        results["auth_error"] = bal.get("error", "")
+    except Exception as e:
+        results["auth_ok"]    = False
+        results["equity"]     = 0
+        results["auth_error"] = str(e)[:120]
+
+    # 3. Proxy / region info
+    import config as cfg
+    results["proxy_configured"] = bool(cfg.BYBIT_PROXY_URL)
+    results["proxy_url"]        = (cfg.BYBIT_PROXY_URL.split("@")[-1]
+                                   if "@" in cfg.BYBIT_PROXY_URL
+                                   else cfg.BYBIT_PROXY_URL[:40]) if cfg.BYBIT_PROXY_URL else ""
+
+    # 4. Server's visible IP
+    try:
+        ip_r = req.get("https://api.ipify.org?format=json", timeout=5)
+        results["server_ip"] = ip_r.json().get("ip", "?")
+    except Exception:
+        results["server_ip"] = "unknown"
+
+    results["ok"] = results.get("bybit_reachable") and results.get("auth_ok")
+    return jsonify(results)
+
+
 @app.route("/api/trade", methods=["POST"])
 def api_trade():
     from decimal import Decimal

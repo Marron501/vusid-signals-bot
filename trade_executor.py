@@ -5,6 +5,7 @@ Handles order placement, position closing, leverage management, and sizing.
 from __future__ import annotations
 
 import logging
+import os
 from decimal import Decimal, ROUND_DOWN
 
 from pybit.unified_trading import HTTP
@@ -14,6 +15,23 @@ import config
 logger = logging.getLogger(__name__)
 
 CATEGORY = "linear"
+
+
+def _apply_proxy() -> str | None:
+    """
+    If BYBIT_PROXY_URL is configured, inject it into the process environment so
+    that the underlying `requests` library (used by pybit) routes all HTTPS calls
+    through the proxy.  Returns the proxy URL for logging, or None if not set.
+    """
+    proxy = config.BYBIT_PROXY_URL
+    if not proxy:
+        return None
+    os.environ["HTTP_PROXY"]  = proxy
+    os.environ["HTTPS_PROXY"] = proxy
+    # Make sure requests doesn't accidentally bypass the proxy for bybit domains
+    os.environ.pop("NO_PROXY",  None)
+    os.environ.pop("no_proxy",  None)
+    return proxy
 
 
 class TradeExecutor:
@@ -29,6 +47,14 @@ class TradeExecutor:
 
         if not key or not secret:
             raise ValueError("BYBIT_API_KEY and BYBIT_API_SECRET must be set")
+
+        proxy = _apply_proxy()
+        if proxy:
+            # Mask credentials for logging
+            safe = proxy.split("@")[-1] if "@" in proxy else proxy[:40]
+            logger.info(f"[proxy] Bybit requests routed via {safe}")
+        else:
+            logger.info("[proxy] Direct connection (no proxy)")
 
         self.client = HTTP(
             api_key=key,

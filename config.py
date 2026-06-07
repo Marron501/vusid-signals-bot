@@ -44,3 +44,9 @@ POSITION_MODE = int(os.getenv("POSITION_MODE", "0"))  # 0 = one-way
 
 # --- Auto-execute signals ---
 AUTO_EXECUTE = os.getenv("AUTO_EXECUTE", "true").lower() in ("true", "1", "yes")
+
+# --- Bybit proxy (optional) --------------------------------------------------
+# Set BYBIT_PROXY_URL if your server's IP is blocked by Bybit (e.g. Railway US West).
+# Format: http://user:pass@host:port  OR  socks5://user:pass@host:port
+# Leave blank to connect directly (recommended after moving to EU/AP Railway region).
+BYBIT_PROXY_URL = os.getenv("BYBIT_PROXY_URL", "").strip()
