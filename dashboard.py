@@ -372,24 +372,43 @@ def api_trade():
             cfg = _cfg(); ex = _executor()
             eq_frac = Decimal(str(cfg.EQUITY_FRACTION))
             lev     = Decimal(str(cfg.DEFAULT_LEVERAGE))
-        cost = ex.get_equity() * eq_frac
+        equity = ex.get_equity()
+        cost   = equity * eq_frac
+        if cost <= 0:
+            return jsonify({"success": False, "error": f"Account equity is {float(equity):.2f} USDT — deposit funds first"})
+        if sym not in ex.instruments:
+            return jsonify({"success": False, "error": f"{sym} is not a tradeable USDT perpetual on Bybit"})
         ok   = ex.open_position(sym, side, cost, lev)
         if ok:
             return jsonify({"success": True, "symbol": sym, "side": side,
                             "entry": str(ex.get_mark_price(sym)),
                             "cost": str(round(float(cost), 2))})
-        return jsonify({"success": False, "error": "Order failed"})
+        return jsonify({"success": False, "error": "Order placement failed — check Railway logs"})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 
 
 @app.route("/api/close", methods=["POST"])
 def api_close():
-    d   = request.get_json() or {}
-    sym = d.get("symbol", "").upper().strip()
+    d      = request.get_json() or {}
+    sym    = d.get("symbol", "").upper().strip()
+    acc_id = d.get("account_id")
     if not sym: return jsonify({"success": False, "error": "Symbol required"})
     if not sym.endswith("USDT"): sym += "USDT"
     try:
+        if acc_id:
+            from accounts_manager import load_accounts, get_executor
+            accs = load_accounts()
+            acc  = next((a for a in accs if a["id"] == acc_id), None)
+            if not acc: return jsonify({"success": False, "error": "Account not found"})
+            ex = get_executor(acc)
+            positions = ex.get_my_positions()
+            closed = False
+            for key, pos in positions.items():
+                if pos["symbol"] == sym:
+                    closed = ex.close_position(sym, pos["side"])
+                    break
+            return jsonify({"success": closed, "symbol": sym})
         from signal_listener import SignalExecutor
         return jsonify({"success": SignalExecutor()._close(sym), "symbol": sym})
     except Exception as e:
@@ -398,7 +417,19 @@ def api_close():
 
 @app.route("/api/close-all", methods=["POST"])
 def api_close_all():
+    d      = request.get_json() or {}
+    acc_id = d.get("account_id")
     try:
+        if acc_id:
+            from accounts_manager import load_accounts, get_executor
+            accs = load_accounts()
+            acc  = next((a for a in accs if a["id"] == acc_id), None)
+            if not acc: return jsonify({"success": False, "error": "Account not found"})
+            ex        = get_executor(acc)
+            positions = ex.get_my_positions()
+            for _, pos in positions.items():
+                ex.close_position(pos["symbol"], pos["side"])
+            return jsonify({"success": True})
         from signal_listener import SignalExecutor
         return jsonify({"success": SignalExecutor()._close_all()})
     except Exception as e:
