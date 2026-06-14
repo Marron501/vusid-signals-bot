@@ -383,7 +383,8 @@ def api_trade():
             return jsonify({"success": True, "symbol": sym, "side": side,
                             "entry": str(ex.get_mark_price(sym)),
                             "cost": str(round(float(cost), 2))})
-        return jsonify({"success": False, "error": "Order placement failed — check Railway logs"})
+        err = getattr(ex, "last_open_error", "") or "Order placement failed — check Railway logs"
+        return jsonify({"success": False, "error": err})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)})
 

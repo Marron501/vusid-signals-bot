@@ -218,13 +218,16 @@ class TradeExecutor:
     def open_position(self, symbol: str, side: str, cost_usdt: Decimal, leverage: Decimal) -> bool:
         """Open a new position with market order."""
         import time
+        self.last_open_error = ""
         self.set_leverage(symbol, leverage)
         qty = self.calculate_qty(symbol, cost_usdt, leverage)
 
         if not qty:
-            logger.error(f"Cannot calculate valid qty for {symbol}")
+            self.last_open_error = f"Cannot calculate valid qty for {symbol} (cost={cost_usdt:.2f})"
+            logger.error(self.last_open_error)
             return False
 
+        last_err = ""
         for attempt in range(1, 4):
             try:
                 result = self.client.place_order(
@@ -238,9 +241,11 @@ class TradeExecutor:
                 logger.info(f"OPENED {side} {symbol}: qty={qty}, leverage={leverage}x, orderId={result['result']['orderId']}")
                 return True
             except Exception as e:
+                last_err = str(e)
                 logger.error(f"Attempt {attempt}/3 failed to open {side} {symbol}: {e}")
                 if attempt < 3:
                     time.sleep(attempt * 2)
+        self.last_open_error = last_err
         return False
 
     def close_position(self, symbol: str, side: str) -> bool:
