@@ -437,6 +437,70 @@ def api_close_all():
         return jsonify({"success": False, "error": str(e)})
 
 
+@app.route("/api/positions")
+def api_positions():
+    """Return all open positions across primary + every enabled extra account in parallel."""
+    import concurrent.futures
+    from decimal import Decimal, InvalidOperation
+    from accounts_manager import load_accounts, get_executor as _get_acc_ex
+
+    def _pct(pnl, entry, size, leverage):
+        try:
+            margin = Decimal(str(entry)) * Decimal(str(size)) / Decimal(str(leverage))
+            return float(Decimal(str(pnl)) / margin * 100) if margin else 0
+        except (InvalidOperation, ZeroDivisionError):
+            return 0
+
+    def _map_pos(pos_map, account_id, account_name, is_demo):
+        out = []
+        for p in pos_map.values():
+            out.append({
+                "account_id":   account_id,
+                "account_name": account_name,
+                "is_demo":      is_demo,
+                "symbol":       p["symbol"],
+                "side":         p["side"],
+                "size":         str(p["size"]),
+                "leverage":     str(p["leverage"]),
+                "entry":        str(p["avgPrice"]),
+                "pnl":          float(p["unrealisedPnl"]),
+                "pct":          _pct(p["unrealisedPnl"], p["avgPrice"],
+                                     p["size"], p["leverage"]),
+            })
+        return out
+
+    def fetch_primary():
+        try:
+            ex = _executor()
+            return _map_pos(ex.get_my_positions(), "primary", "Primary",
+                            _cfg().USE_TESTNET)
+        except Exception as e:
+            log.error(f"[positions] primary: {e}")
+            return []
+
+    def fetch_extra(acc):
+        try:
+            ex = _get_acc_ex(acc)
+            return _map_pos(ex.get_my_positions(), acc["id"], acc["name"],
+                            acc.get("testnet", False))
+        except Exception as e:
+            log.error(f"[positions] {acc['name']}: {e}")
+            return []
+
+    extras = [a for a in load_accounts()
+              if a.get("enabled") and a.get("api_key") and a.get("api_secret")]
+    all_pos = []
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        futs = [pool.submit(fetch_primary)] + [pool.submit(fetch_extra, a) for a in extras]
+        for f in concurrent.futures.as_completed(futs):
+            all_pos.extend(f.result())
+
+    account_meta = [{"id": a["id"], "name": a["name"],
+                     "is_demo": a.get("testnet", False)} for a in extras]
+    return jsonify({"positions": all_pos, "total": len(all_pos),
+                    "accounts": account_meta})
+
+
 # ── HTML ──────────────────────────────────────────────────────────────────────
 
 HTML = r"""<!DOCTYPE html>
@@ -610,6 +674,42 @@ button,input,select{font-family:inherit}
 .pos-bar{background:var(--card);border-radius:4px;height:3px;margin-top:12px;
   border:1px solid var(--border);overflow:hidden}
 .pos-bar-fill{height:100%;transition:width .5s;border-radius:4px}
+.pos-close-btn{position:absolute;top:10px;right:10px;background:var(--redbg);
+  color:var(--red);border:1px solid var(--redb);border-radius:8px;
+  padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;gap:4px;transition:all .15s;line-height:1}
+.pos-close-btn:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.pos-close-btn:active{transform:scale(.93)}
+.pos-close-btn:disabled{opacity:.55;pointer-events:none}
+.pos-close-btn svg{width:10px;height:10px;stroke-width:3;flex-shrink:0}
+.pos-demo-badge,.pos-live-badge{display:inline-block;border-radius:5px;
+  padding:1px 6px;font-size:9px;font-weight:800;letter-spacing:.4px;vertical-align:middle}
+.pos-demo-badge{background:rgba(139,92,246,.15);color:#a78bfa;border:1px solid rgba(139,92,246,.3)}
+.pos-live-badge{background:var(--greenbg);color:var(--green);border:1px solid var(--greenb)}
+.acct-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.acct-tab{padding:6px 13px;border-radius:9px;font-size:10.5px;font-weight:700;cursor:pointer;
+  border:1px solid var(--border);background:var(--card2);color:var(--text3);
+  transition:all .15s;line-height:1.2}
+.acct-tab.active{background:var(--accentbg);color:var(--accent2);border-color:var(--accentbrd)}
+.acct-tab:active{transform:scale(.95)}
+.cs-overlay{position:fixed;inset:0;z-index:300;background:var(--modal-bg);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  display:none;align-items:flex-end;justify-content:center}
+.cs-overlay.open{display:flex}
+.cs-sheet{background:var(--surface);border:1px solid var(--border);
+  border-radius:24px 24px 0 0;padding:20px;width:100%;max-height:90dvh;overflow-y:auto;
+  padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));
+  animation:slideup .25s cubic-bezier(.4,0,.2,1)}
+.cs-handle{width:40px;height:4px;background:var(--border2);border-radius:4px;margin:0 auto 18px}
+.cs-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
+.cs-stat{background:var(--card2);border-radius:10px;padding:10px;border:1px solid var(--border)}
+.cs-stat-lbl{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
+  color:var(--text3);margin-bottom:4px}
+.cs-stat-val{font-size:16px;font-weight:800}
+.cs-warn{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);
+  border-radius:10px;padding:10px 12px;font-size:11px;color:var(--red);margin-bottom:14px}
+.cs-demo-note{background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.25);
+  border-radius:10px;padding:10px 12px;font-size:11px;color:#a78bfa;margin-bottom:10px}
 
 /* ── LIST ROWS ───────────────────────────────────────── */
 .row{padding:12px 0;border-bottom:1px solid var(--border);
@@ -850,14 +950,27 @@ select.inp option{background:var(--card);color:var(--text)}
   <div class="card mb">
     <div class="card-label">
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="2" y="3" width="20" height="14" rx="2" stroke-linecap="round" stroke-linejoin="round"/><line x1="8" y1="21" x2="16" y2="21" stroke-linecap="round" stroke-linejoin="round"/><line x1="12" y1="17" x2="12" y2="21" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Portfolio
+      Portfolio · <span class="live-dot"></span>All Accounts
+    </div>
+    <div class="acct-tabs" id="pos-acct-tabs">
+      <button class="acct-tab active" onclick="setPosAccount('all',this)">All</button>
+      <button class="acct-tab" onclick="setPosAccount('primary',this)">Primary</button>
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center">
       <div><div style="font-size:36px;font-weight:900;color:var(--accent2)" id="p-count">0</div><div style="font-size:11px;color:var(--text3)">open positions</div></div>
-      <div style="text-align:right"><div style="font-size:26px;font-weight:900" id="p-tpnl">—</div><div style="font-size:11px;color:var(--text3)">unrealised PnL</div></div>
+      <div style="text-align:right">
+        <div style="font-size:26px;font-weight:900" id="p-tpnl">—</div>
+        <div style="font-size:11px;color:var(--text3)">unrealised PnL</div>
+      </div>
     </div>
   </div>
-  <div id="pos-list"><div class="empty"><svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 1 0 0-4h14a2 2 0 1 0 0 4M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8m-9 4h4"/></svg>No open positions</div></div>
+  <div id="pos-list"><div class="empty"><svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 1 0 0-4h14a2 2 0 1 0 0 4M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8m-9 4h4"/></svg><div style="margin-top:8px">Fetching positions…</div></div></div>
+  <div id="pos-close-all-wrap" style="display:none;margin:8px 0 4px">
+    <button class="btn btn-red btn-sm" style="width:auto;padding:9px 18px" onclick="closeAllVisible()">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-linecap="round" stroke-linejoin="round"/><line x1="15" y1="9" x2="9" y2="15" stroke-linecap="round" stroke-linejoin="round"/><line x1="9" y1="9" x2="15" y2="15" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Close All Visible
+    </button>
+  </div>
   <div class="div"></div>
   <div class="card-label" style="margin-bottom:10px">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/></svg>
@@ -1070,6 +1183,52 @@ select.inp option{background:var(--card);color:var(--text)}
 
 <div id="toast"></div>
 
+<!-- CLOSE POSITION CONFIRM SHEET -->
+<div class="cs-overlay" id="cs-overlay" onclick="if(event.target===this)cancelClose()">
+  <div class="cs-sheet">
+    <div class="cs-handle"></div>
+    <div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px">Close Position</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div style="font-size:26px;font-weight:900" id="cs-symbol">—</div>
+      <span id="cs-mode-badge"></span>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:4px">
+      <span class="tag" id="cs-side-tag">—</span>
+      <span class="tag blue" id="cs-lev-tag">—</span>
+      <span class="tag" id="cs-acct-tag" style="color:var(--accent2)">—</span>
+    </div>
+    <div class="cs-stats">
+      <div class="cs-stat">
+        <div class="cs-stat-lbl">Entry Price</div>
+        <div class="cs-stat-val" id="cs-entry">—</div>
+      </div>
+      <div class="cs-stat">
+        <div class="cs-stat-lbl">Size</div>
+        <div class="cs-stat-val" id="cs-size">—</div>
+      </div>
+      <div class="cs-stat">
+        <div class="cs-stat-lbl">Unrealised PnL</div>
+        <div class="cs-stat-val" id="cs-pnl">—</div>
+      </div>
+      <div class="cs-stat">
+        <div class="cs-stat-lbl">PnL %</div>
+        <div class="cs-stat-val" id="cs-pct">—</div>
+      </div>
+    </div>
+    <div id="cs-demo-note" class="cs-demo-note" style="display:none">
+      🎮 <strong>Demo position</strong> — no real funds at risk
+    </div>
+    <div class="cs-warn">
+      ⚠️ Closes immediately at market price. Cannot be undone.
+    </div>
+    <button class="btn btn-red" id="cs-confirm-btn" onclick="confirmClose()">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-linecap="round" stroke-linejoin="round"/><line x1="15" y1="9" x2="9" y2="15" stroke-linecap="round" stroke-linejoin="round"/><line x1="9" y1="9" x2="15" y2="15" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Close Position
+    </button>
+    <button class="btn btn-ghost btn-sm" onclick="cancelClose()" style="margin-top:8px">Cancel</button>
+  </div>
+</div>
+
 <script>
 /* ── Theme ───────────────────────────────────────────── */
 const _th = localStorage.getItem('theme') || 'dark';
@@ -1107,6 +1266,9 @@ let _accounts = [];
 let _sigFilter = 'all';
 let _sigOffset = 0;
 const _SIG_PAGE = 200;
+let _allPositions = [];
+let _posAccFilter = 'all';
+let _closePending  = null;
 
 /* ── Tabs ────────────────────────────────────────────── */
 function goTab(tab) {
@@ -1118,6 +1280,7 @@ function goTab(tab) {
   if (tab === 'signals') {
     document.getElementById('sig-nav-dot').classList.remove('show');
   }
+  if (tab === 'positions') fetchPositions();
   if (tab === 'logs') renderLogs(logFilter);
 }
 
@@ -1259,27 +1422,68 @@ function render() {
 }
 
 /* ── Positions ───────────────────────────────────────── */
-function renderPositions(acc) {
-  const pos = (acc && acc.positions) || [];
+async function fetchPositions() {
+  try {
+    const r = await fetch('/api/positions');
+    const d = await r.json();
+    _allPositions = d.positions || [];
+    // rebuild account filter tabs
+    const tabs = document.getElementById('pos-acct-tabs');
+    const extras = d.accounts || [];
+    let html = `<button class="acct-tab${_posAccFilter==='all'?' active':''}" onclick="setPosAccount('all',this)">All</button>`;
+    html += `<button class="acct-tab${_posAccFilter==='primary'?' active':''}" onclick="setPosAccount('primary',this)">Primary</button>`;
+    extras.forEach(a => {
+      const mode = a.is_demo ? ' DEMO' : ' LIVE';
+      html += `<button class="acct-tab${_posAccFilter===a.id?' active':''}" onclick="setPosAccount('${a.id}',this)">${a.name}${mode}</button>`;
+    });
+    tabs.innerHTML = html;
+    renderPositionCards();
+  } catch(e) { console.error('[pos]', e); }
+}
+
+function setPosAccount(id, el) {
+  _posAccFilter = id;
+  document.querySelectorAll('.acct-tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderPositionCards();
+}
+
+function _visiblePos() {
+  if (_posAccFilter === 'all') return _allPositions;
+  if (_posAccFilter === 'primary') return _allPositions.filter(p => p.account_id === 'primary');
+  return _allPositions.filter(p => p.account_id === _posAccFilter);
+}
+
+function renderPositionCards() {
+  const pos = _visiblePos();
   document.getElementById('p-count').textContent = pos.length;
-  const tpnl = (acc && acc.total_pnl) || 0;
+  const tpnl = pos.reduce((s, p) => s + (p.pnl || 0), 0);
   const tpEl = document.getElementById('p-tpnl');
   tpEl.textContent = (tpnl >= 0 ? '+' : '') + tpnl.toFixed(2) + ' USDT';
   tpEl.style.color = tpnl >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('pos-close-all-wrap').style.display = pos.length > 1 ? 'block' : 'none';
   const pl = document.getElementById('pos-list');
   if (!pos.length) {
     pl.innerHTML = `<div class="empty"><svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 8h14M5 8a2 2 0 1 0 0-4h14a2 2 0 1 0 0 4M5 8v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8m-9 4h4"/></svg>No open positions</div>`;
     return;
   }
-  pl.innerHTML = pos.map(p => {
-    const pnl = p.pnl, pct = p.pct || 0;
-    const c   = pnl >= 0 ? 'var(--green)' : 'var(--red)';
-    const sc  = p.side === 'Buy' ? 'long' : 'short';
-    return `<div class="pos-card ${sc}">
+  pl.innerHTML = pos.map((p, i) => {
+    const pnl = p.pnl || 0, pct = p.pct || 0;
+    const c  = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    const sc = p.side === 'Buy' ? 'long' : 'short';
+    const badge = p.is_demo
+      ? '<span class="pos-demo-badge">DEMO</span>'
+      : '<span class="pos-live-badge">LIVE</span>';
+    return `<div class="pos-card ${sc}" id="poscard-${i}">
       <div class="side-bar"></div>
+      <button class="pos-close-btn" id="pcb-${i}" onclick="closePosition(${i})" title="Close position">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round"/></svg>
+        Close
+      </button>
       <div class="pos-head">
-        <div>
-          <div class="pos-sym">${p.symbol}</div>
+        <div style="padding-right:70px">
+          <div class="pos-sym">${p.symbol} ${badge}</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:1px">${p.account_name || 'Primary'}</div>
           <div class="tags">
             <span class="tag ${sc}">${p.side === 'Buy' ? 'Long ↑' : 'Short ↓'}</span>
             <span class="tag blue">${p.leverage}×</span>
@@ -1287,7 +1491,7 @@ function renderPositions(acc) {
             <span class="tag cyan">@ ${parseFloat(p.entry).toFixed(4)}</span>
           </div>
         </div>
-        <div>
+        <div style="flex-shrink:0">
           <div class="pos-pnl" style="color:${c}">${(pnl>=0?'+':'')+pnl.toFixed(2)}</div>
           <div class="pos-pct" style="color:${c}">${(pct>=0?'+':'')+pct.toFixed(2)}%</div>
         </div>
@@ -1295,6 +1499,111 @@ function renderPositions(acc) {
       <div class="pos-bar"><div class="pos-bar-fill" style="width:${Math.min(Math.abs(pct)*5,100)}%;background:${c}"></div></div>
     </div>`;
   }).join('');
+}
+
+function renderPositions(acc) {
+  // called from render() with primary account data — merge into _allPositions
+  const primPos = (acc && acc.positions) || [];
+  // replace primary entries with fresh data from /api/status
+  _allPositions = _allPositions.filter(p => p.account_id !== 'primary');
+  primPos.forEach(p => {
+    _allPositions.unshift({
+      account_id: 'primary', account_name: 'Primary',
+      is_demo: false,
+      symbol: p.symbol, side: p.side, size: String(p.size),
+      leverage: String(p.leverage), entry: String(p.entry),
+      pnl: p.pnl || 0, pct: p.pct || 0,
+    });
+  });
+  renderPositionCards();
+}
+
+/* ── Close single position ───────────────────────────── */
+function closePosition(idx) {
+  const p = _visiblePos()[idx];
+  if (!p) return;
+  _closePending = {...p, _idx: idx};
+  // populate sheet
+  document.getElementById('cs-symbol').textContent  = p.symbol;
+  const sc = p.side === 'Buy' ? 'long' : 'short';
+  const sideTag = document.getElementById('cs-side-tag');
+  sideTag.textContent  = p.side === 'Buy' ? 'Long ↑' : 'Short ↓';
+  sideTag.className    = `tag ${sc}`;
+  document.getElementById('cs-lev-tag').textContent  = `${p.leverage}×`;
+  document.getElementById('cs-acct-tag').textContent = p.account_name || 'Primary';
+  document.getElementById('cs-mode-badge').innerHTML = p.is_demo
+    ? '<span class="pos-demo-badge">DEMO</span>'
+    : '<span class="pos-live-badge">LIVE</span>';
+  document.getElementById('cs-entry').textContent = parseFloat(p.entry).toFixed(4);
+  document.getElementById('cs-size').textContent  = p.size;
+  const pnl = p.pnl || 0, pct = p.pct || 0;
+  const pnlEl = document.getElementById('cs-pnl');
+  pnlEl.textContent  = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + ' USDT';
+  pnlEl.style.color  = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+  const pctEl = document.getElementById('cs-pct');
+  pctEl.textContent  = (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%';
+  pctEl.style.color  = pct >= 0 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('cs-demo-note').style.display = p.is_demo ? 'block' : 'none';
+  const btn = document.getElementById('cs-confirm-btn');
+  btn.disabled = false;
+  btn.innerHTML = `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px;stroke-width:2"><circle cx="12" cy="12" r="10" stroke-linecap="round"/><line x1="15" y1="9" x2="9" y2="15" stroke-linecap="round"/><line x1="9" y1="9" x2="15" y2="15" stroke-linecap="round"/></svg> Close Position`;
+  document.getElementById('cs-overlay').classList.add('open');
+}
+
+function cancelClose() {
+  document.getElementById('cs-overlay').classList.remove('open');
+  _closePending = null;
+}
+
+async function confirmClose() {
+  if (!_closePending) return;
+  const p   = _closePending;
+  const btn = document.getElementById('cs-confirm-btn');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Closing…';
+  try {
+    const body = {symbol: p.symbol, side: p.side};
+    if (p.account_id && p.account_id !== 'primary') body.account_id = p.account_id;
+    const r = await fetch('/api/close', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    cancelClose();
+    if (d.success) {
+      toast(`✅ Closed ${p.symbol}${p.is_demo ? ' (Demo)' : ''}`);
+      // optimistically remove from local state
+      _allPositions = _allPositions.filter(x =>
+        !(x.symbol === p.symbol && x.account_id === p.account_id && x.side === p.side));
+      renderPositionCards();
+      countdown = 4;
+    } else {
+      toast('❌ ' + (d.error || 'Close failed'), false);
+    }
+  } catch(e) { cancelClose(); toast('❌ Network error', false); }
+}
+
+async function closeAllVisible() {
+  const pos = _visiblePos();
+  if (!pos.length) return;
+  if (!confirm(`Close all ${pos.length} visible position(s)? This cannot be undone.`)) return;
+  toast('Closing all…');
+  let ok = 0, fail = 0;
+  await Promise.all(pos.map(async p => {
+    try {
+      const body = {symbol: p.symbol, side: p.side};
+      if (p.account_id && p.account_id !== 'primary') body.account_id = p.account_id;
+      const r = await fetch('/api/close', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(body)
+      });
+      const d = await r.json();
+      d.success ? ok++ : fail++;
+    } catch { fail++; }
+  }));
+  toast(fail === 0 ? `✅ All ${ok} position(s) closed` : `⚠️ ${ok} closed, ${fail} failed`, fail === 0);
+  await fetchPositions();
+  countdown = 4;
 }
 
 /* ── History ─────────────────────────────────────────── */
@@ -1604,19 +1913,20 @@ async function closeTrade() {
   let sym = document.getElementById('inp-sym').value.trim().toUpperCase();
   if (!sym) { toast('Enter symbol', false); return; }
   if (!sym.endsWith('USDT')) sym += 'USDT';
+  toast(`Closing ${sym}…`);
   const r = await fetch('/api/close', {method:'POST', headers:{'Content-Type':'application/json'},
     body: JSON.stringify({symbol: sym})});
   const d = await r.json();
   toast(d.success ? `✅ Closed ${sym}` : '❌ ' + (d.error||'Failed'), d.success);
-  if (d.success) countdown = 2;
+  if (d.success) { countdown = 3; fetchPositions(); }
 }
 async function closeAll() {
-  if (!confirm('Close ALL open positions now?')) return;
+  if (!confirm('Close ALL open positions on primary account?')) return;
   toast('Closing all…');
   const r = await fetch('/api/close-all', {method:'POST'});
   const d = await r.json();
   toast(d.success ? '✅ All positions closed' : '❌ Some failed', d.success);
-  countdown = 2;
+  countdown = 3; fetchPositions();
 }
 function refreshNow() { countdown = 12; _sigOffset = 0; fetchData(); toast('Refreshed ✅'); }
 
@@ -1630,9 +1940,11 @@ function tick() {
 
 /* ── Boot ────────────────────────────────────────────── */
 fetchData();
+fetchPositions();
 loadAccounts();
 connectSSE();
 setInterval(tick, 1000);
+setInterval(fetchPositions, 15000); // refresh positions every 15s independent of main data
 </script>
 </body>
 </html>"""
