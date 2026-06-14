@@ -143,9 +143,10 @@ class SignalParser:
         r"(?:sl|stop\s*loss)\s+(?:hit|triggered)\s+(\w+)",
     ]
 
+    # Handles: "SHORT : COAIUSDT", "SELL BTCUSDT", "buy BTC @ 50000"
     SIGNAL_PATTERN = re.compile(
-        r"(?P<side>buy|sell|long|short)\s+"
-        r"(?P<symbol>[A-Za-z]+(?:USDT)?)\s*"
+        r"(?P<side>buy|sell|long|short)\s*:?\s+"
+        r"(?P<symbol>[A-Za-z0-9]+(?:USDT)?)\s*"
         r"(?:@\s*)?(?P<entry>[\d.]+)?\s*"
         r"(?:.*?(?:sl|stop\s*loss)[:\s]*(?P<sl>[\d.]+))?\s*"
         r"(?:.*?(?:tp|take\s*profit|target)[:\s]*(?P<tp>[\d.]+))?\s*"
@@ -154,8 +155,17 @@ class SignalParser:
     )
 
     @classmethod
+    def _preprocess(cls, text: str) -> str:
+        """Normalise common Discord signal formatting quirks."""
+        # Strip currency symbol before numbers: $0.34 → 0.34, $50,000 → 50000
+        text = re.sub(r'\$\s*(\d)', r'\1', text)
+        # Normalise double-dots: 0..34 → 0.34 (copy-paste artefact)
+        text = re.sub(r'(\d)\.\.([\d])', r'\1.\2', text)
+        return text
+
+    @classmethod
     def parse(cls, message: str):
-        text = message.strip()
+        text = cls._preprocess(message.strip())
 
         for pattern in cls.CLOSE_PATTERNS:
             match = re.search(pattern, text, re.IGNORECASE)

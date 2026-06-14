@@ -34,7 +34,7 @@ _DEFAULTS: dict = {
     "note":            "",
 }
 
-_lock = threading.Lock()
+_lock = threading.RLock()  # reentrant: load_accounts() called inside add/update while lock held
 
 
 # ── CRUD ─────────────────────────────────────────────────────────────────────
