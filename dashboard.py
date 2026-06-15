@@ -121,10 +121,43 @@ def get_stats():
     return s
 
 
-def get_history(limit=30):
-    if not HISTORY_FILE.exists(): return []
-    try: return list(reversed(json.loads(HISTORY_FILE.read_text())))[:limit]
-    except Exception: return []
+def get_history(limit=50):
+    """Return trade history — prefers trade_history.json, falls back to executed signals."""
+    hist = []
+    # 1. Try dedicated history file
+    if HISTORY_FILE.exists():
+        try:
+            hist = list(reversed(json.loads(HISTORY_FILE.read_text())))
+        except Exception:
+            pass
+    # 2. Augment / fallback with executed signals from signals.json
+    if SIGNALS_FILE.exists():
+        try:
+            all_sigs = json.loads(SIGNALS_FILE.read_text())
+            existing_ids = {h.get("msg_id") for h in hist}
+            for s in all_sigs:
+                if not s.get("executed"):
+                    continue
+                mid = str(s.get("msg_id", ""))
+                if mid and mid in existing_ids:
+                    continue
+                sig = s.get("signal", {})
+                hist.append({
+                    "timestamp": s.get("timestamp", ""),
+                    "msg_id":    mid,
+                    "symbol":    sig.get("symbol", "?"),
+                    "side":      sig.get("side", "?"),
+                    "action":    sig.get("action", "open"),
+                    "leverage":  str(sig.get("leverage") or "—"),
+                    "take_profit": str(sig.get("take_profit") or ""),
+                    "stop_loss":   str(sig.get("stop_loss") or ""),
+                    "source":    s.get("source", "live"),
+                    "analysis":  s.get("analysis"),
+                })
+        except Exception as e:
+            log.error(f"get_history signals fallback: {e}")
+    hist.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    return hist[:limit]
 
 
 def get_signals(limit=200, offset=0):
@@ -220,6 +253,38 @@ def api_signals():
         try: total = len(json.loads(SIGNALS_FILE.read_text()))
         except Exception: pass
     return jsonify({"signals": sigs, "total": total, "offset": offset, "limit": limit})
+
+
+@app.route("/api/reanalyze", methods=["POST"])
+def api_reanalyze():
+    """Backfill AI analysis on any open-signal entries that don't have one yet."""
+    from signal_analyzer import analyze_signal
+    from signal_listener import get_win_rate
+    if not SIGNALS_FILE.exists():
+        return jsonify({"updated": 0, "total": 0})
+    try:
+        all_sigs = json.loads(SIGNALS_FILE.read_text())
+    except Exception as e:
+        return jsonify({"updated": 0, "error": str(e)})
+    try:
+        _, wins, total = get_win_rate()
+        wr = wins / total if total > 0 else 0.0
+    except Exception:
+        wr = 0.0
+    updated = 0
+    for s in all_sigs:
+        if s.get("analysis") and s["analysis"].get("enabled"):
+            continue
+        sig = s.get("signal", {})
+        if sig.get("action") != "open":
+            continue
+        try:
+            s["analysis"] = analyze_signal(dict(sig), wr)
+            updated += 1
+        except Exception as e:
+            log.error(f"reanalyze: {e}")
+    SIGNALS_FILE.write_text(json.dumps(all_sigs, default=str))
+    return jsonify({"updated": updated, "total": len(all_sigs)})
 
 
 @app.route("/api/settings", methods=["POST"])
@@ -2067,14 +2132,44 @@ async function closeAllVisible() {
 /* ── History ─────────────────────────────────────────── */
 function renderHistory(hist) {
   const hl = document.getElementById('hist-list');
-  if (!hist.length) { hl.innerHTML = `<div class="empty"><svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>No history yet</div>`; return; }
-  hl.innerHTML = hist.map(t => `<div class="row">
-    <div class="row-left">
-      <div class="row-sym">${t.symbol} <span style="font-size:10.5px;color:${t.side==='Buy'?'var(--green)':'var(--red)'};font-weight:700">${t.side}</span></div>
-      <div class="row-meta">${new Date(t.timestamp).toLocaleString()}</div>
-    </div>
-    <span class="badge ${t.action==='open'?'b-open':'b-close'}">${t.action.toUpperCase()}</span>
-  </div>`).join('');
+  if (!hist.length) {
+    hl.innerHTML = `<div class="empty"><svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2"/></svg>No executed trades yet</div>`;
+    return;
+  }
+  hl.innerHTML = hist.map(t => {
+    const sc   = t.side === 'Buy' ? 'var(--green)' : 'var(--red)';
+    const dir  = t.side === 'Buy' ? 'LONG ↑' : (t.side === 'Sell' ? 'SHORT ↓' : t.action?.toUpperCase() || '—');
+    const a    = t.analysis;
+    const score = a && a.enabled ? a.score : null;
+    const scolor = score != null ? _scoreColor(score) : 'var(--text3)';
+    const rec   = a && a.recommendation ? a.recommendation : null;
+    const recEmoji = {take:'✅', caution:'⚠️', skip:'❌'}[rec] || '';
+    const tp   = t.take_profit ? `<span class="tag" style="color:var(--green);background:var(--greenbg);border-color:var(--greenb)">TP ${t.take_profit}</span>` : '';
+    const sl   = t.stop_loss   ? `<span class="tag" style="color:var(--red);background:var(--redbg);border-color:var(--redb)">SL ${t.stop_loss}</span>` : '';
+    const lev  = t.leverage && t.leverage !== '—' ? `<span class="tag blue">${t.leverage}×</span>` : '';
+    const srcTag = t.source === 'recovery' ? ' <span style="font-size:9px;color:var(--cyan)">⏪</span>' : '';
+    return `<div class="row" style="flex-direction:column;align-items:stretch;gap:6px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div class="row-left">
+          <div style="display:flex;align-items:center;gap:6px">
+            <span class="row-sym">${t.symbol || '?'}</span>
+            <span style="font-size:11px;font-weight:800;color:${sc}">${dir}</span>
+            ${srcTag}
+          </div>
+          <div class="row-meta">${new Date(t.timestamp).toLocaleString()}</div>
+        </div>
+        ${score != null ? `<div style="text-align:right;flex-shrink:0">
+          <div style="font-size:22px;font-weight:900;color:${scolor};line-height:1">${score}</div>
+          <div style="font-size:9px;color:var(--text3);font-weight:700">AI SCORE</div>
+        </div>` : '<span class="badge b-open">EXECUTED</span>'}
+      </div>
+      ${(tp||sl||lev) ? `<div class="tags">${tp}${sl}${lev}</div>` : ''}
+      ${a && a.summary ? `<div style="font-size:10.5px;color:var(--text2);line-height:1.4;
+        background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:7px 9px">
+        ${recEmoji} ${a.summary}
+      </div>` : ''}
+    </div>`;
+  }).join('');
 }
 
 /* ── Signals ─────────────────────────────────────────── */
