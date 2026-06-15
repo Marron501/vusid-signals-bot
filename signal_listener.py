@@ -143,25 +143,33 @@ class SignalParser:
         r"(?:sl|stop\s*loss)\s+(?:hit|triggered)\s+(\w+)",
     ]
 
-    # Handles: "SHORT : COAIUSDT", "SELL BTCUSDT", "buy BTC @ 50000"
+    # Core pattern: just side + symbol.  TP/SL/leverage extracted separately so
+    # order in the message doesn't matter and abbreviations like "SL:" are handled.
     SIGNAL_PATTERN = re.compile(
         r"(?P<side>buy|sell|long|short)\s*:?\s+"
-        r"(?P<symbol>[A-Za-z0-9]+(?:USDT)?)\s*"
-        r"(?:@\s*)?(?P<entry>[\d.]+)?\s*"
-        r"(?:.*?(?:sl|stop\s*loss)[:\s]*(?P<sl>[\d.]+))?\s*"
-        r"(?:.*?(?:tp|take\s*profit|target)[:\s]*(?P<tp>[\d.]+))?\s*"
-        r"(?:.*?(?:lev|leverage)[:\s]*(?P<leverage>[\d.]+)x?)?\s*",
-        re.IGNORECASE | re.DOTALL
+        r"(?P<symbol>[A-Za-z0-9]+(?:USDT)?)"
+        r"(?:\s*(?:@\s*)?(?P<entry>[\d.]+))?",
+        re.IGNORECASE
     )
+
+    # Standalone field patterns (searched independently on the full text)
+    _TP_PAT  = re.compile(r"(?:take\s*profit|tp)\s*[:\-]?\s*(?:tp\s*:?\s*)?([\d.]+)", re.IGNORECASE)
+    _SL_PAT  = re.compile(r"(?:stop\s*loss|sl)\s*[:\-]?\s*(?:sl\s*:?\s*)?([\d.]+)",   re.IGNORECASE)
+    _LEV_PAT = re.compile(r"(\d+)\s*x(?:\s*cross)?",                                   re.IGNORECASE)
 
     @classmethod
     def _preprocess(cls, text: str) -> str:
-        """Normalise common Discord signal formatting quirks."""
-        # Strip currency symbol before numbers: $0.34 → 0.34, $50,000 → 50000
-        text = re.sub(r'\$\s*(\d)', r'\1', text)
-        # Normalise double-dots: 0..34 → 0.34 (copy-paste artefact)
-        text = re.sub(r'(\d)\.\.([\d])', r'\1.\2', text)
+        text = re.sub(r'\$\s*(\d)', r'\1', text)           # $0.34 → 0.34
+        text = re.sub(r'(\d)\.\.(\d)', r'\1.\2', text)     # 0..34 → 0.34
+        text = re.sub(r',(\d{3})', r'\1', text)             # 50,000 → 50000
         return text
+
+    @classmethod
+    def _decimal(cls, m, group=1):
+        try:
+            return Decimal(m.group(group)) if m else None
+        except Exception:
+            return None
 
     @classmethod
     def parse(cls, message: str):
@@ -192,22 +200,15 @@ class SignalParser:
         if not symbol.endswith("USDT"):
             symbol += "USDT"
 
-        result = {
+        return {
             "action":      "open",
             "symbol":      symbol,
             "side":        cls.SIDE_MAP[side_raw],
-            "entry":       Decimal(match.group("entry"))     if match.group("entry")    else None,
-            "stop_loss":   Decimal(match.group("sl"))        if match.group("sl")       else None,
-            "take_profit": Decimal(match.group("tp"))        if match.group("tp")       else None,
-            "leverage":    Decimal(match.group("leverage"))  if match.group("leverage") else None,
+            "entry":       cls._decimal(match, "entry"),
+            "stop_loss":   cls._decimal(cls._SL_PAT.search(text)),
+            "take_profit": cls._decimal(cls._TP_PAT.search(text)),
+            "leverage":    cls._decimal(cls._LEV_PAT.search(text)),
         }
-
-        if result["leverage"] is None:
-            lev_match = re.search(r"(\d+)\s*x\b", text, re.IGNORECASE)
-            if lev_match:
-                result["leverage"] = Decimal(lev_match.group(1))
-
-        return result
 
 
 # ─────────────────────────────────────────────
