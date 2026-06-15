@@ -1313,7 +1313,17 @@ select.inp option{background:var(--card);color:var(--text)}
 </div>
 
 <!-- MARKET PANEL: TOP GAINERS / LOSERS -->
-<div class="market-panel" id="market-panel">
+<!-- Market panel toggle bar -->
+<div style="display:flex;align-items:center;justify-content:space-between;
+  background:var(--card);border-bottom:1px solid var(--border);padding:0 12px;height:28px">
+  <span style="font-size:9.5px;font-weight:800;letter-spacing:.1em;color:var(--text3);text-transform:uppercase">
+    <span class="mkt-pulse gain" style="margin-right:5px"></span>Market Movers
+  </span>
+  <button id="mkt-toggle-btn" onclick="toggleMarketPanel()"
+    style="font-size:10px;font-weight:700;color:var(--accent2);background:none;border:none;
+    cursor:pointer;padding:4px 0;letter-spacing:.03em">Show ▾</button>
+</div>
+<div class="market-panel" id="market-panel" style="display:none">
   <div class="market-col">
     <div class="market-col-hd gain">
       <span class="mkt-pulse gain"></span>Top Gainers
@@ -1468,10 +1478,16 @@ select.inp option{background:var(--card);color:var(--text)}
   </div>
 
   <!-- AI SCORE GUIDE -->
-  <div class="card-label" style="margin:14px 0 8px">
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
-    AI Score Guide
+  <div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 8px">
+    <div class="card-label" style="margin:0">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+      AI Score Guide
+    </div>
+    <button id="guide-toggle-btn" onclick="toggleScoreGuide()"
+      style="font-size:10px;font-weight:700;color:var(--accent2);background:none;border:none;
+      cursor:pointer;padding:4px 0;letter-spacing:.03em">Show ▾</button>
   </div>
+  <div id="score-guide-body" style="display:none">
   <div class="card" style="padding:0;overflow:hidden">
     <div style="padding:10px 12px 6px;background:var(--card2)">
       <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.08em">HOW SIGNALS ARE SCORED (0 – 100)</div>
@@ -1496,6 +1512,7 @@ select.inp option{background:var(--card);color:var(--text)}
       <span class="pill" style="background:rgba(244,67,54,.1);color:#ef5350;border:1px solid rgba(244,67,54,.3)">&lt;60 — Skip / Loss Risk</span>
     </div>
   </div>
+  </div><!-- /score-guide-body -->
 
   <div class="countdown" id="cd">—</div>
 </div></div>
@@ -2478,6 +2495,34 @@ function _sigBadge(s, isNew) {
   return '<span class="badge b-skip">⛔ Skipped</span>';
 }
 
+/* ── Collapsible panels ──────────────────────────────── */
+function toggleMarketPanel() {
+  const panel = document.getElementById('market-panel');
+  const btn   = document.getElementById('mkt-toggle-btn');
+  const shown = panel.style.display !== 'none';
+  panel.style.display = shown ? 'none' : 'grid';
+  btn.textContent     = shown ? 'Show ▾' : 'Hide ▴';
+  localStorage.setItem('mkt_panel', shown ? '0' : '1');
+}
+function toggleScoreGuide() {
+  const body = document.getElementById('score-guide-body');
+  const btn  = document.getElementById('guide-toggle-btn');
+  const shown = body.style.display !== 'none';
+  body.style.display = shown ? 'none' : 'block';
+  btn.textContent    = shown ? 'Show ▾' : 'Hide ▴';
+  localStorage.setItem('score_guide', shown ? '0' : '1');
+}
+function _restorePanels() {
+  if (localStorage.getItem('mkt_panel') === '1') {
+    document.getElementById('market-panel').style.display = 'grid';
+    document.getElementById('mkt-toggle-btn').textContent = 'Hide ▴';
+  }
+  if (localStorage.getItem('score_guide') === '1') {
+    document.getElementById('score-guide-body').style.display = 'block';
+    document.getElementById('guide-toggle-btn').textContent = 'Hide ▴';
+  }
+}
+
 /* ── Market Panel (Gainers / Losers) ─────────────────── */
 function _fmtPrice(p) {
   if (!p) return '';
@@ -3154,6 +3199,7 @@ function tick() {
 }
 
 /* ── Boot ────────────────────────────────────────────── */
+_restorePanels();
 fetchData();
 fetchPositions();
 loadAccounts();
