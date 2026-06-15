@@ -566,7 +566,8 @@ button,input,select{font-family:inherit}
   border-bottom:1px solid var(--border);
   padding:11px 16px;padding-top:calc(11px + env(safe-area-inset-top,0px));
   display:flex;align-items:center;justify-content:space-between;
-  position:sticky;top:0;z-index:60;transition:background .3s,border-color .3s}
+  position:sticky;top:0;z-index:60;transition:background .3s,border-color .3s;
+  overflow:hidden}
 .brand-name{font-size:22px;font-weight:900;letter-spacing:-.5px;
   background:linear-gradient(135deg,var(--accent),var(--cyan));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
@@ -674,14 +675,15 @@ button,input,select{font-family:inherit}
 .pos-bar{background:var(--card);border-radius:4px;height:3px;margin-top:12px;
   border:1px solid var(--border);overflow:hidden}
 .pos-bar-fill{height:100%;transition:width .5s;border-radius:4px}
-.pos-close-btn{position:absolute;top:10px;right:10px;background:var(--redbg);
+.pos-close-btn{width:100%;margin-top:10px;background:var(--redbg);
   color:var(--red);border:1px solid var(--redb);border-radius:8px;
-  padding:5px 11px;font-size:10.5px;font-weight:700;cursor:pointer;
-  display:flex;align-items:center;gap:4px;transition:all .15s;line-height:1}
+  padding:8px 14px;font-size:11px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:5px;
+  transition:all .15s;line-height:1}
 .pos-close-btn:hover{background:var(--red);color:#fff;border-color:var(--red)}
-.pos-close-btn:active{transform:scale(.93)}
+.pos-close-btn:active{transform:scale(.98)}
 .pos-close-btn:disabled{opacity:.55;pointer-events:none}
-.pos-close-btn svg{width:10px;height:10px;stroke-width:3;flex-shrink:0}
+.pos-close-btn svg{width:11px;height:11px;stroke-width:3;flex-shrink:0}
 .pos-demo-badge,.pos-live-badge{display:inline-block;border-radius:5px;
   padding:1px 6px;font-size:9px;font-weight:800;letter-spacing:.4px;vertical-align:middle}
 .pos-demo-badge{background:rgba(139,92,246,.15);color:#a78bfa;border:1px solid rgba(139,92,246,.3)}
@@ -903,16 +905,71 @@ select.inp option{background:var(--card);color:var(--text)}
 .ad-pos-item:last-child{margin-bottom:0}
 .ad-pos-sym{font-size:14px;font-weight:800}
 .ad-pos-pnl{font-size:13px;font-weight:800;text-align:right}
+
+/* ── ANIMATED BACKGROUND ─────────────────────────────── */
+.bg-canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+.bg-grid{position:absolute;inset:0;
+  background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);
+  background-size:44px 44px;
+  animation:gridDrift 60s linear infinite}
+:root[data-theme="dark"]{--grid-line:rgba(255,107,53,.04)}
+:root[data-theme="light"]{--grid-line:rgba(234,88,12,.04)}
+@keyframes gridDrift{from{background-position:0 0}to{background-position:44px 44px}}
+.bg-orb{position:absolute;border-radius:50%;filter:blur(90px);animation:orbFloat linear infinite}
+.bg-orb-1{width:340px;height:340px;top:-80px;left:-60px;
+  background:var(--accent);opacity:.07;animation-duration:28s}
+.bg-orb-2{width:260px;height:260px;bottom:10%;right:-80px;
+  background:var(--cyan);opacity:.05;animation-duration:22s;animation-delay:-8s}
+.bg-orb-3{width:200px;height:200px;bottom:40%;left:30%;
+  background:var(--accent2);opacity:.045;animation-duration:35s;animation-delay:-14s}
+@keyframes orbFloat{
+  0%  {transform:translate(0,0) scale(1)}
+  25% {transform:translate(20px,-30px) scale(1.08)}
+  50% {transform:translate(-15px,20px) scale(.95)}
+  75% {transform:translate(25px,10px) scale(1.04)}
+  100%{transform:translate(0,0) scale(1)}
+}
+/* Scan line shimmer on topbar */
+.topbar::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:linear-gradient(105deg,transparent 40%,rgba(255,107,53,.04) 50%,transparent 60%);
+  background-size:200% 100%;animation:shimmer 6s ease-in-out infinite}
+@keyframes shimmer{0%,100%{background-position:200% 0}50%{background-position:-200% 0}}
 </style>
 </head>
 <body>
+<!-- ANIMATED BACKGROUND -->
+<div class="bg-canvas" aria-hidden="true">
+  <div class="bg-grid"></div>
+  <div class="bg-orb bg-orb-1"></div>
+  <div class="bg-orb bg-orb-2"></div>
+  <div class="bg-orb bg-orb-3"></div>
+</div>
 <div class="app">
 
 <!-- TOP BAR -->
 <div class="topbar">
-  <div>
-    <div class="brand-name">Prolific</div>
-    <div class="brand-sub">Signals Bot</div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <!-- Prolific logo mark -->
+    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <rect width="36" height="36" rx="9" fill="url(#logoGrad)"/>
+      <defs>
+        <linearGradient id="logoGrad" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
+          <stop stop-color="#FF6B35"/>
+          <stop offset="1" stop-color="#C2410C"/>
+        </linearGradient>
+      </defs>
+      <!-- P letterform -->
+      <path d="M11 9h8a5 5 0 0 1 0 10h-4v8H11V9z" fill="white"/>
+      <path d="M15 12h3.5a1.5 1.5 0 0 1 0 3H15v-3z" fill="#FF6B35"/>
+      <!-- Upward trend line on right side -->
+      <polyline points="23,25 25,21 27,23 29,18" stroke="white" stroke-width="1.6"
+        stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+    </svg>
+    <div>
+      <div class="brand-name">Prolific</div>
+      <div class="brand-sub">Signals Bot</div>
+    </div>
   </div>
   <div class="top-right">
     <span class="sig-flash" id="sig-flash"></span>
@@ -1606,27 +1663,27 @@ function renderPositionCards() {
       : '<span class="pos-live-badge">LIVE</span>';
     return `<div class="pos-card ${sc}" id="poscard-${i}">
       <div class="side-bar"></div>
-      <button class="pos-close-btn" id="pcb-${i}" onclick="closePosition(${i})" title="Close position">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round"/></svg>
-        Close
-      </button>
       <div class="pos-head">
-        <div style="padding-right:70px">
+        <div>
           <div class="pos-sym">${p.symbol} ${badge}</div>
           <div style="font-size:10px;color:var(--text3);margin-top:1px">${p.account_name || 'Primary'}</div>
-          <div class="tags">
-            <span class="tag ${sc}">${p.side === 'Buy' ? 'Long ↑' : 'Short ↓'}</span>
-            <span class="tag blue">${p.leverage}×</span>
-            <span class="tag">Qty ${p.size}</span>
-            <span class="tag cyan">@ ${parseFloat(p.entry).toFixed(4)}</span>
-          </div>
         </div>
-        <div style="flex-shrink:0">
+        <div style="flex-shrink:0;text-align:right">
           <div class="pos-pnl" style="color:${c}">${(pnl>=0?'+':'')+pnl.toFixed(2)}</div>
           <div class="pos-pct" style="color:${c}">${(pct>=0?'+':'')+pct.toFixed(2)}%</div>
         </div>
       </div>
-      <div class="pos-bar"><div class="pos-bar-fill" style="width:${Math.min(Math.abs(pct)*5,100)}%;background:${c}"></div></div>
+      <div class="tags" style="margin-top:8px">
+        <span class="tag ${sc}">${p.side === 'Buy' ? 'Long ↑' : 'Short ↓'}</span>
+        <span class="tag blue">${p.leverage}×</span>
+        <span class="tag">Qty ${p.size}</span>
+        <span class="tag cyan">@ ${parseFloat(p.entry).toFixed(4)}</span>
+      </div>
+      <div class="pos-bar" style="margin-top:10px"><div class="pos-bar-fill" style="width:${Math.min(Math.abs(pct)*5,100)}%;background:${c}"></div></div>
+      <button class="pos-close-btn" id="pcb-${i}" onclick="closePosition(${i})">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round"/></svg>
+        Close Position
+      </button>
     </div>`;
   }).join('');
 }
