@@ -437,6 +437,30 @@ def api_close_all():
         return jsonify({"success": False, "error": str(e)})
 
 
+@app.route("/api/set-sl-tp", methods=["POST"])
+def api_set_sl_tp():
+    d      = request.get_json() or {}
+    sym    = d.get("symbol", "").upper().strip()
+    side   = d.get("side", "")
+    sl     = d.get("stop_loss")
+    tp     = d.get("take_profit")
+    acc_id = d.get("account_id")
+    if not sym: return jsonify({"success": False, "error": "Symbol required"})
+    if not sym.endswith("USDT"): sym += "USDT"
+    try:
+        if acc_id and acc_id != "primary":
+            from accounts_manager import load_accounts, get_executor
+            accs = load_accounts()
+            acc  = next((a for a in accs if a["id"] == acc_id), None)
+            if not acc: return jsonify({"success": False, "error": "Account not found"})
+            ex = get_executor(acc)
+        else:
+            ex = _executor()
+        return jsonify(ex.set_trading_stop(sym, side, sl, tp))
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
 @app.route("/api/positions")
 def api_positions():
     """Return all open positions across primary + every enabled extra account in parallel."""
@@ -466,6 +490,8 @@ def api_positions():
                 "pnl":          float(p["unrealisedPnl"]),
                 "pct":          _pct(p["unrealisedPnl"], p["avgPrice"],
                                      p["size"], p["leverage"]),
+                "stop_loss":    str(p.get("stopLoss", "") or ""),
+                "take_profit":  str(p.get("takeProfit", "") or ""),
             })
         return out
 
@@ -675,7 +701,19 @@ button,input,select{font-family:inherit}
 .pos-bar{background:var(--card);border-radius:4px;height:3px;margin-top:12px;
   border:1px solid var(--border);overflow:hidden}
 .pos-bar-fill{height:100%;transition:width .5s;border-radius:4px}
-.pos-close-btn{width:100%;margin-top:10px;background:var(--redbg);
+.pos-action-row{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.pos-sl-btn{background:var(--redbg);color:var(--red);border:1px solid var(--redb);
+  border-radius:8px;padding:7px 10px;font-size:10.5px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:4px;transition:all .15s;line-height:1.2;
+  flex-direction:column}
+.pos-tp-btn{background:var(--greenbg);color:var(--green);border:1px solid var(--greenb);
+  border-radius:8px;padding:7px 10px;font-size:10.5px;font-weight:700;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:4px;transition:all .15s;line-height:1.2;
+  flex-direction:column}
+.pos-sl-btn:hover{background:var(--red);color:#fff;border-color:var(--red)}
+.pos-tp-btn:hover{background:var(--green);color:#fff;border-color:var(--green)}
+.pos-sl-btn .sltp-val,.pos-tp-btn .sltp-val{font-size:9px;font-weight:600;opacity:.8;margin-top:2px}
+.pos-close-btn{width:100%;margin-top:6px;background:var(--redbg);
   color:var(--red);border:1px solid var(--redb);border-radius:8px;
   padding:8px 14px;font-size:11px;font-weight:700;cursor:pointer;
   display:flex;align-items:center;justify-content:center;gap:5px;
@@ -1363,6 +1401,49 @@ select.inp option{background:var(--card);color:var(--text)}
   </div>
 </div>
 
+<!-- SL / TP SHEET -->
+<div class="cs-overlay" id="sltp-overlay" onclick="if(event.target===this)cancelSLTP()">
+  <div class="cs-sheet">
+    <div class="cs-handle"></div>
+    <div style="font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:6px" id="sltp-mode-lbl">Set Stop Loss / Take Profit</div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+      <div style="font-size:22px;font-weight:900" id="sltp-symbol">—</div>
+      <span id="sltp-side-tag" class="tag"></span>
+    </div>
+
+    <!-- SL row -->
+    <div style="margin-bottom:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <label style="font-size:11px;font-weight:700;color:var(--red)">🛑 Stop Loss</label>
+        <span style="font-size:10px;color:var(--text3)" id="sltp-cur-sl">current: —</span>
+      </div>
+      <div style="display:flex;gap:6px">
+        <input class="inp" id="sltp-sl-inp" type="number" step="any" placeholder="Price (0 to clear)" style="flex:1;font-size:14px"/>
+        <button class="btn btn-ghost btn-sm" onclick="clearSLTP('sl')" style="width:auto;padding:0 12px;font-size:11px;color:var(--text3)">Clear</button>
+      </div>
+    </div>
+
+    <!-- TP row -->
+    <div style="margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
+        <label style="font-size:11px;font-weight:700;color:var(--green)">🎯 Take Profit</label>
+        <span style="font-size:10px;color:var(--text3)" id="sltp-cur-tp">current: —</span>
+      </div>
+      <div style="display:flex;gap:6px">
+        <input class="inp" id="sltp-tp-inp" type="number" step="any" placeholder="Price (0 to clear)" style="flex:1;font-size:14px"/>
+        <button class="btn btn-ghost btn-sm" onclick="clearSLTP('tp')" style="width:auto;padding:0 12px;font-size:11px;color:var(--text3)">Clear</button>
+      </div>
+    </div>
+
+    <div class="cs-warn" style="margin-bottom:12px">Orders execute at market when price is reached.</div>
+    <button class="btn btn-primary" id="sltp-confirm-btn" onclick="confirmSLTP()">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+      Set SL / TP
+    </button>
+    <button class="btn btn-ghost btn-sm" onclick="cancelSLTP()" style="margin-top:8px">Cancel</button>
+  </div>
+</div>
+
 <!-- ACCOUNT DETAIL SHEET -->
 <div class="cs-overlay" id="ad-overlay" onclick="if(event.target===this)closeAccountDetail()">
   <div class="cs-sheet" style="max-height:85vh;overflow-y:auto">
@@ -1680,6 +1761,16 @@ function renderPositionCards() {
         <span class="tag cyan">@ ${parseFloat(p.entry).toFixed(4)}</span>
       </div>
       <div class="pos-bar" style="margin-top:10px"><div class="pos-bar-fill" style="width:${Math.min(Math.abs(pct)*5,100)}%;background:${c}"></div></div>
+      <div class="pos-action-row">
+        <button class="pos-sl-btn" onclick="openSLTP(${i})">
+          🛑 Stop Loss
+          <span class="sltp-val">${p.stop_loss ? parseFloat(p.stop_loss).toFixed(4) : 'Not set'}</span>
+        </button>
+        <button class="pos-tp-btn" onclick="openSLTP(${i})">
+          🎯 Take Profit
+          <span class="sltp-val">${p.take_profit ? parseFloat(p.take_profit).toFixed(4) : 'Not set'}</span>
+        </button>
+      </div>
       <button class="pos-close-btn" id="pcb-${i}" onclick="closePosition(${i})">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18" stroke-linecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke-linecap="round"/></svg>
         Close Position
@@ -1768,6 +1859,83 @@ async function confirmClose() {
       toast('❌ ' + (d.error || 'Close failed'), false);
     }
   } catch(e) { cancelClose(); toast('❌ Network error', false); }
+}
+
+/* ── SL / TP ─────────────────────────────────────────── */
+let _sltpPending = null;
+
+function openSLTP(idx) {
+  const p = _visiblePos()[idx];
+  if (!p) return;
+  _sltpPending = {...p, _idx: idx};
+  document.getElementById('sltp-symbol').textContent = p.symbol;
+  const sc = p.side === 'Buy' ? 'long' : 'short';
+  const st = document.getElementById('sltp-side-tag');
+  st.textContent  = p.side === 'Buy' ? 'Long ↑' : 'Short ↓';
+  st.className    = `tag ${sc}`;
+  // Show current values
+  const curSl = p.stop_loss  ? parseFloat(p.stop_loss).toFixed(4)  : 'none';
+  const curTp = p.take_profit ? parseFloat(p.take_profit).toFixed(4) : 'none';
+  document.getElementById('sltp-cur-sl').textContent = `current: ${curSl}`;
+  document.getElementById('sltp-cur-tp').textContent = `current: ${curTp}`;
+  // Pre-fill inputs with existing values
+  document.getElementById('sltp-sl-inp').value = p.stop_loss  ? parseFloat(p.stop_loss)  : '';
+  document.getElementById('sltp-tp-inp').value = p.take_profit ? parseFloat(p.take_profit) : '';
+  const demoNote = p.is_demo ? ' (Demo)' : '';
+  document.getElementById('sltp-mode-lbl').textContent = `SL / TP · ${p.symbol}${demoNote}`;
+  document.getElementById('sltp-overlay').classList.add('open');
+}
+
+function clearSLTP(type) {
+  document.getElementById(`sltp-${type}-inp`).value = '0';
+}
+
+function cancelSLTP() {
+  document.getElementById('sltp-overlay').classList.remove('open');
+  _sltpPending = null;
+}
+
+async function confirmSLTP() {
+  if (!_sltpPending) return;
+  const p = _sltpPending;
+  const slVal = document.getElementById('sltp-sl-inp').value.trim();
+  const tpVal = document.getElementById('sltp-tp-inp').value.trim();
+  if (!slVal && !tpVal) { toast('Enter at least one value', false); return; }
+  const btn = document.getElementById('sltp-confirm-btn');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Setting…';
+  try {
+    const body = {symbol: p.symbol, side: p.side};
+    if (slVal !== '') body.stop_loss  = parseFloat(slVal);
+    if (tpVal !== '') body.take_profit = parseFloat(tpVal);
+    if (p.account_id && p.account_id !== 'primary') body.account_id = p.account_id;
+    const r = await fetch('/api/set-sl-tp', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    cancelSLTP();
+    btn.disabled = false;
+    btn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:14px;height:14px"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg> Set SL / TP';
+    if (d.success) {
+      toast(`✅ SL/TP updated for ${p.symbol}`);
+      // patch local cache so card updates immediately
+      const idx = _allPositions.findIndex(x =>
+        x.symbol === p.symbol && x.account_id === p.account_id && x.side === p.side);
+      if (idx !== -1) {
+        if (slVal !== '') _allPositions[idx].stop_loss  = slVal === '0' ? '' : slVal;
+        if (tpVal !== '') _allPositions[idx].take_profit = tpVal === '0' ? '' : tpVal;
+      }
+      renderPositionCards();
+      setTimeout(fetchPositions, 3000);
+    } else {
+      toast('❌ ' + (d.error || 'Failed to set SL/TP'), false);
+    }
+  } catch(e) {
+    cancelSLTP();
+    btn.disabled = false;
+    toast('❌ Network error', false);
+  }
 }
 
 async function closeAllVisible() {

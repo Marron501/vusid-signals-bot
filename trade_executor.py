@@ -212,6 +212,8 @@ class TradeExecutor:
                     "avgPrice": Decimal(p["avgPrice"]),
                     "unrealisedPnl": Decimal(p["unrealisedPnl"]),
                     "positionIdx": p["positionIdx"],
+                    "stopLoss":  p.get("stopLoss", ""),
+                    "takeProfit": p.get("takeProfit", ""),
                 }
         return positions
 
@@ -275,6 +277,26 @@ class TradeExecutor:
         except Exception as e:
             logger.error(f"Failed to close {side} {symbol}: {e}")
             return False
+
+    def set_trading_stop(self, symbol: str, side: str,
+                         stop_loss=None, take_profit=None) -> dict:
+        """Set or clear SL/TP for an open position via Bybit trading-stop endpoint."""
+        try:
+            kwargs = dict(
+                category=CATEGORY,
+                symbol=symbol,
+                positionIdx=config.POSITION_MODE,
+            )
+            if stop_loss is not None:
+                kwargs["stopLoss"] = "" if str(stop_loss) == "0" else str(stop_loss)
+            if take_profit is not None:
+                kwargs["takeProfit"] = "" if str(take_profit) == "0" else str(take_profit)
+            self.client.set_trading_stop(**kwargs)
+            logger.info(f"set_trading_stop {symbol} SL={stop_loss} TP={take_profit}")
+            return {"success": True}
+        except Exception as e:
+            logger.error(f"set_trading_stop failed {symbol}: {e}")
+            return {"success": False, "error": str(e)}
 
     def adjust_position(self, symbol: str, side: str, new_cost_usdt: Decimal, leverage: Decimal) -> bool:
         """Adjust an existing position size (increase or partial close)."""
