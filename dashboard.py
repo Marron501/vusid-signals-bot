@@ -510,39 +510,39 @@ HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="theme-color" id="theme-meta" content="#060a14">
+<meta name="theme-color" id="theme-meta" content="#06060A">
 <title>Prolific</title>
 <style>
-/* ── TOKENS ──────────────────────────────────────────── */
+/* ── TOKENS — NEST ZERO ──────────────────────────────── */
 :root[data-theme="dark"]{
-  --bg:#060a14;--surface:#0b1120;--card:#0f172a;--card2:#131e33;--card3:#172039;
-  --border:#1e3050;--border2:#253a60;
-  --accent:#3b82f6;--accent2:#60a5fa;
-  --accentbg:rgba(59,130,246,.1);--accentbrd:rgba(59,130,246,.3);
-  --cyan:#06b6d4;--cyanbg:rgba(6,182,212,.1);
-  --indigo:#818cf8;--indigobg:rgba(129,140,248,.1);
-  --green:#22c55e;--greenbg:rgba(34,197,94,.1);--greenb:rgba(34,197,94,.3);
-  --red:#ef4444;--redbg:rgba(239,68,68,.1);--redb:rgba(239,68,68,.3);
-  --yellow:#f59e0b;--yellowbg:rgba(245,158,11,.1);
-  --text:#e2e8f0;--text2:#8b9ab8;--text3:#3d5275;
-  --shadow:rgba(0,5,20,.7);
-  --nav-bg:rgba(6,10,20,.96);--top-bg:rgba(6,10,20,.94);
-  --input-bg:#080e1c;--modal-bg:rgba(0,5,20,.85);
+  --bg:#06060A;--surface:#0E0E14;--card:#111118;--card2:#16161F;--card3:#1C1C27;
+  --border:rgba(255,255,255,.06);--border2:rgba(255,255,255,.1);
+  --accent:#FF6B35;--accent2:#FF8C5A;
+  --accentbg:rgba(255,107,53,.1);--accentbrd:rgba(255,107,53,.3);
+  --cyan:#22D3EE;--cyanbg:rgba(34,211,238,.08);
+  --indigo:#818cf8;--indigobg:rgba(129,140,248,.08);
+  --green:#4ADE80;--greenbg:rgba(74,222,128,.08);--greenb:rgba(74,222,128,.25);
+  --red:#F87171;--redbg:rgba(248,113,113,.08);--redb:rgba(248,113,113,.25);
+  --yellow:#FBBF24;--yellowbg:rgba(251,191,36,.08);
+  --text:#F8F8F4;--text2:#9898A8;--text3:#4A4A5A;
+  --shadow:rgba(0,0,0,.5);
+  --nav-bg:rgba(6,6,10,.96);--top-bg:rgba(6,6,10,.94);
+  --input-bg:#0A0A10;--modal-bg:rgba(0,0,0,.75);
 }
 :root[data-theme="light"]{
-  --bg:#eef2ff;--surface:#e8edf8;--card:#fff;--card2:#f4f7ff;--card3:#eef2ff;
-  --border:#c7d4f0;--border2:#b8c8e8;
-  --accent:#2563eb;--accent2:#3b82f6;
-  --accentbg:rgba(37,99,235,.07);--accentbrd:rgba(37,99,235,.25);
-  --cyan:#0891b2;--cyanbg:rgba(8,145,178,.08);
-  --indigo:#6366f1;--indigobg:rgba(99,102,241,.08);
-  --green:#16a34a;--greenbg:rgba(22,163,74,.08);--greenb:rgba(22,163,74,.25);
-  --red:#dc2626;--redbg:rgba(220,38,38,.08);--redb:rgba(220,38,38,.25);
-  --yellow:#d97706;--yellowbg:rgba(217,119,6,.08);
-  --text:#0f172a;--text2:#475569;--text3:#94a3b8;
-  --shadow:rgba(0,20,80,.1);
-  --nav-bg:rgba(238,242,255,.97);--top-bg:rgba(238,242,255,.95);
-  --input-bg:#e8edf8;--modal-bg:rgba(14,30,80,.6);
+  --bg:#F8F8F4;--surface:#F0F0EC;--card:#FFFFFF;--card2:#F4F4F0;--card3:#EBEBЕ7;
+  --border:rgba(0,0,0,.07);--border2:rgba(0,0,0,.12);
+  --accent:#EA580C;--accent2:#C2410C;
+  --accentbg:rgba(234,88,12,.08);--accentbrd:rgba(234,88,12,.25);
+  --cyan:#0891B2;--cyanbg:rgba(8,145,178,.07);
+  --indigo:#6366F1;--indigobg:rgba(99,102,241,.07);
+  --green:#16A34A;--greenbg:rgba(22,163,74,.07);--greenb:rgba(22,163,74,.22);
+  --red:#DC2626;--redbg:rgba(220,38,38,.07);--redb:rgba(220,38,38,.22);
+  --yellow:#D97706;--yellowbg:rgba(217,119,6,.07);
+  --text:#1A1A1A;--text2:#5A5A6A;--text3:#A0A0B0;
+  --shadow:rgba(0,0,0,.06);
+  --nav-bg:rgba(248,248,244,.97);--top-bg:rgba(248,248,244,.95);
+  --input-bg:#EEEEED;--modal-bg:rgba(0,0,0,.4);
 }
 
 /* ── RESET ───────────────────────────────────────────── */
@@ -789,8 +789,8 @@ select.inp option{background:var(--card);color:var(--text)}
   align-items:center;justify-content:center;gap:8px}
 .btn:active{transform:scale(.97);opacity:.88}
 .btn svg{width:16px;height:16px;stroke-width:2.2}
-.btn-primary{background:linear-gradient(135deg,var(--accent),#1d4ed8);color:#fff;
-  box-shadow:0 4px 20px rgba(59,130,246,.3)}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#c2410c);color:#fff;
+  box-shadow:0 4px 20px rgba(255,107,53,.3)}
 .btn-green{background:var(--greenbg);color:var(--green);border:1px solid var(--greenb)}
 .btn-red{background:var(--redbg);color:var(--red);border:1px solid var(--redb)}
 .btn-ghost{background:var(--card);color:var(--text2);border:1px solid var(--border)}
@@ -857,6 +857,52 @@ select.inp option{background:var(--card);color:var(--text)}
 ::-webkit-scrollbar{width:3px;height:3px}
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+
+/* ── ACCOUNT MINI CARDS (home screen) ───────────────── */
+.acct-mini{display:flex;align-items:center;gap:12px;background:var(--card);
+  border:1px solid var(--border);border-radius:16px;padding:14px 16px;
+  margin-bottom:8px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden}
+.acct-mini::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
+  background:var(--accent);border-radius:3px 0 0 3px}
+.acct-mini.demo::before{background:var(--cyan)}
+.acct-mini:active{transform:scale(.98);background:var(--card2)}
+.acct-mini-icon{width:36px;height:36px;border-radius:10px;background:var(--accentbg);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.acct-mini.demo .acct-mini-icon{background:var(--cyanbg)}
+.acct-mini-icon svg{width:18px;height:18px;stroke-width:2;color:var(--accent)}
+.acct-mini.demo .acct-mini-icon svg{color:var(--cyan)}
+.acct-mini-body{flex:1;min-width:0}
+.acct-mini-name{font-size:13px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acct-mini-sub{font-size:10px;color:var(--text3);margin-top:1px}
+.acct-mini-right{text-align:right;flex-shrink:0}
+.acct-mini-eq{font-size:16px;font-weight:900;letter-spacing:-.3px}
+.acct-mini-pnl{font-size:10.5px;font-weight:700;margin-top:1px}
+.acct-mini-arrow{font-size:18px;color:var(--text3);margin-left:6px;flex-shrink:0}
+.acct-mini-badge{display:inline-block;padding:2px 7px;border-radius:5px;font-size:8.5px;
+  font-weight:800;letter-spacing:.5px;margin-left:5px;vertical-align:middle}
+.badge-live{background:var(--greenbg);color:var(--green);border:1px solid var(--greenb)}
+.badge-demo{background:var(--cyanbg);color:var(--cyan);border:1px solid rgba(34,211,238,.3)}
+
+/* ── ARC GAUGE ───────────────────────────────────────── */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;margin:4px 0 8px}
+.gauge-svg{width:140px;height:76px;overflow:visible}
+.gauge-track{fill:none;stroke:var(--card2);stroke-width:10;stroke-linecap:round}
+.gauge-fill{fill:none;stroke-width:10;stroke-linecap:round;
+  transition:stroke-dashoffset .8s cubic-bezier(.4,0,.2,1)}
+.gauge-center{font-size:28px;font-weight:900;fill:var(--text);text-anchor:middle}
+.gauge-sub{font-size:9px;fill:var(--text3);text-anchor:middle;
+  font-weight:700;text-transform:uppercase;letter-spacing:1px}
+
+/* ── ACCOUNT DETAIL SHEET ────────────────────────────── */
+.ad-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
+.ad-stat{background:var(--card2);border-radius:12px;padding:12px;border:1px solid var(--border)}
+.ad-stat-lbl{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
+  color:var(--text3);margin-bottom:4px}
+.ad-stat-val{font-size:18px;font-weight:900}
+.ad-pos-item{background:var(--card2);border-radius:10px;padding:10px 12px;margin-bottom:8px;border:1px solid var(--border)}
+.ad-pos-item:last-child{margin-bottom:0}
+.ad-pos-sym{font-size:14px;font-weight:800}
+.ad-pos-pnl{font-size:13px;font-weight:800;text-align:right}
 </style>
 </head>
 <body>
@@ -887,35 +933,74 @@ select.inp option{background:var(--card);color:var(--text)}
 
 <!-- ① HOME -->
 <div class="page active" id="page-home"><div class="pad">
+
+  <!-- Hero balance -->
   <div class="hero">
-    <div class="hero-lbl">Total Balance</div>
+    <div class="hero-lbl">Primary Balance</div>
     <div class="hero-amt" id="b-equity">— USDT</div>
-    <div class="hero-sub">LIVE · Bybit Unified · <span id="b-ts">—</span></div>
+    <div class="hero-sub">Bybit Unified · <span id="b-ts">—</span></div>
     <div class="bal-grid">
       <div class="bal-box"><div class="bal-lbl">Available</div><div class="bal-val cyan" id="b-avail">—</div><div style="font-size:9px;color:var(--text3);margin-top:2px">USDT</div></div>
-      <div class="bal-box"><div class="bal-lbl">Used Margin</div><div class="bal-val blue" id="b-margin">—</div><div style="font-size:9px;color:var(--text3);margin-top:2px">USDT</div></div>
+      <div class="bal-box"><div class="bal-lbl">Used Margin</div><div class="bal-val" style="color:var(--accent2)" id="b-margin">—</div><div style="font-size:9px;color:var(--text3);margin-top:2px">USDT</div></div>
       <div class="bal-box"><div class="bal-lbl">Unrealised PnL</div><div class="bal-val" id="b-upnl">—</div><div style="font-size:9px;color:var(--text3);margin-top:2px">USDT</div></div>
-      <div class="bal-box"><div class="bal-lbl">Per Trade</div><div class="bal-val blue" id="b-pertrade">—</div><div style="font-size:9px;color:var(--text3);margin-top:2px">@ <span id="b-lev">—</span>×</div></div>
+      <div class="bal-box"><div class="bal-lbl">Per Trade</div><div class="bal-val" style="color:var(--accent2)" id="b-pertrade">—</div><div style="font-size:9px;color:var(--text3);margin-top:2px">@ <span id="b-lev">—</span>×</div></div>
     </div>
   </div>
 
-  <div class="stat-grid">
-    <div class="stat-box"><div class="stat-num" style="color:var(--green)" id="s-wins">—</div><div class="stat-lbl">Wins</div></div>
-    <div class="stat-box"><div class="stat-num" style="color:var(--red)" id="s-losses">—</div><div class="stat-lbl">Losses</div></div>
-    <div class="stat-box"><div class="stat-num" style="color:var(--accent2)" id="s-total">—</div><div class="stat-lbl">Signals</div></div>
-  </div>
-
-  <div class="card">
-    <div class="card-label">
-      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2zm0 0V9a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v10m-6 0a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2m0 0V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v14a2 2 0 0 0-2 2h-2a2 2 0 0 0-2-2z"/></svg>
-      Win Rate · ≥70% Filter
+  <!-- Win rate + signal stats -->
+  <div style="display:grid;grid-template-columns:auto 1fr;gap:10px;margin-bottom:12px;align-items:center">
+    <div class="card" style="margin-bottom:0;padding:14px 16px;text-align:center;min-width:130px">
+      <div class="gauge-wrap">
+        <svg class="gauge-svg" viewBox="0 0 140 76">
+          <path class="gauge-track" d="M14,70 A56,56 0 0,1 126,70"/>
+          <path class="gauge-fill" id="h-wr-arc" d="M14,70 A56,56 0 0,1 126,70"
+            stroke="var(--accent)" stroke-dasharray="176" stroke-dashoffset="176"/>
+          <text class="gauge-center" x="70" y="66" id="h-wr">—</text>
+          <text class="gauge-sub" x="70" y="80">Win Rate</text>
+        </svg>
+      </div>
+      <span class="wr-badge" id="h-wr-badge" style="display:inline-block">—</span>
     </div>
-    <div class="wr-row"><div class="wr-big" id="h-wr">—</div><span class="wr-badge" id="h-wr-badge">—</span></div>
-    <div class="bar-track" style="margin-bottom:8px"><div class="bar-fill" id="h-wr-bar" style="width:0"></div></div>
-    <div style="font-size:11px;color:var(--text3)" id="h-wr-sub">—</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:0">
+        <div class="stat-box"><div class="stat-num" style="color:var(--green)" id="s-wins">—</div><div class="stat-lbl">Wins</div></div>
+        <div class="stat-box"><div class="stat-num" style="color:var(--red)" id="s-losses">—</div><div class="stat-lbl">Losses</div></div>
+        <div class="stat-box"><div class="stat-num" style="color:var(--accent2)" id="s-total">—</div><div class="stat-lbl">Signals</div></div>
+      </div>
+      <!-- hidden elements kept for JS compat -->
+      <div style="display:none" id="h-wr-bar"></div>
+      <div style="display:none" id="h-wr-sub"></div>
+      <div class="card" style="margin-bottom:0;padding:10px 12px">
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">
+          <span style="color:var(--text3)">Auto Execute</span>
+          <span id="cfg-auto" style="font-weight:700">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">
+          <span style="color:var(--text3)">Equity / Trade</span>
+          <span id="cfg-eq" style="font-weight:700">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:11px">
+          <span style="color:var(--text3)">Leverage</span>
+          <span id="cfg-lev" style="font-weight:700">—</span>
+        </div>
+      </div>
+    </div>
   </div>
 
-  <div class="qa-grid">
+  <!-- Accounts Overview -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+    <div class="section-lbl" style="margin-bottom:0">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke-linecap="round" stroke-linejoin="round"/><path stroke-linecap="round" stroke-linejoin="round" d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      Accounts
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="goTab('accounts')" style="width:auto;padding:5px 10px;font-size:10px">Manage ›</button>
+  </div>
+  <div id="home-accounts">
+    <div class="acct-mini" style="cursor:default;opacity:.5"><div class="acct-mini-body"><div class="acct-mini-name">Loading accounts…</div></div></div>
+  </div>
+
+  <!-- Quick actions -->
+  <div class="qa-grid" style="margin-top:12px">
     <div class="qa" onclick="goTab('positions')">
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline stroke-linecap="round" stroke-linejoin="round" points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       <span class="qa-lbl">Positions</span>
@@ -924,23 +1009,15 @@ select.inp option{background:var(--card);color:var(--text)}
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.111 16.404a5.5 5.5 0 0 1 7.778 0M12 20h.01M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0M5.105 12.682a9.5 9.5 0 0 1 13.79 0"/></svg>
       <span class="qa-lbl">Signals</span>
     </div>
-    <div class="qa" onclick="goTab('accounts')">
-      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke-linecap="round" stroke-linejoin="round"/><path stroke-linecap="round" stroke-linejoin="round" d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-      <span class="qa-lbl">Accounts</span>
+    <div class="qa" onclick="refreshNow()">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline stroke-linecap="round" stroke-linejoin="round" points="23 4 23 10 17 10"/><path stroke-linecap="round" stroke-linejoin="round" d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+      <span class="qa-lbl">Refresh</span>
     </div>
   </div>
 
-  <div class="card">
-    <div class="card-label">
-      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="3" stroke-linecap="round" stroke-linejoin="round"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-      Configuration
-    </div>
-    <div class="info-row"><span class="info-key">Auto Execute</span><span class="info-val" id="cfg-auto">—</span></div>
-    <div class="info-row"><span class="info-key">Equity / Trade</span><span class="info-val" id="cfg-eq">—</span></div>
-    <div class="info-row"><span class="info-key">Leverage</span><span class="info-val" id="cfg-lev">—</span></div>
-    <div class="info-row"><span class="info-key">Channel</span><span class="info-val" style="color:var(--cyan)">#daily-signals</span></div>
-    <div class="info-row"><span class="info-key">Mode</span><span class="info-val" style="color:var(--red)">LIVE 🔴</span></div>
-    <div class="info-row"><span class="info-key">Updated</span><span class="info-val" id="cfg-ts">—</span></div>
+  <!-- Config detail row (hidden fields kept for JS compat) -->
+  <div style="display:none">
+    <span id="cfg-ts">—</span>
   </div>
   <div class="countdown" id="cd">—</div>
 </div></div>
@@ -1229,6 +1306,49 @@ select.inp option{background:var(--card);color:var(--text)}
   </div>
 </div>
 
+<!-- ACCOUNT DETAIL SHEET -->
+<div class="cs-overlay" id="ad-overlay" onclick="if(event.target===this)closeAccountDetail()">
+  <div class="cs-sheet" style="max-height:85vh;overflow-y:auto">
+    <div class="cs-handle"></div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <div class="acct-mini-icon" id="ad-icon" style="width:40px;height:40px;border-radius:12px;background:var(--accentbg);display:flex;align-items:center;justify-content:center">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="var(--accent)" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <div style="font-size:16px;font-weight:900" id="ad-name">—</div>
+        <div id="ad-badge-wrap" style="margin-top:3px"></div>
+      </div>
+    </div>
+    <div class="ad-grid">
+      <div class="ad-stat">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Equity</div>
+        <div style="font-size:20px;font-weight:900;color:var(--text)" id="ad-equity">—</div>
+        <div style="font-size:9px;color:var(--text3)">USDT</div>
+      </div>
+      <div class="ad-stat">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Available</div>
+        <div style="font-size:20px;font-weight:900;color:var(--cyan)" id="ad-avail">—</div>
+        <div style="font-size:9px;color:var(--text3)">USDT</div>
+      </div>
+      <div class="ad-stat">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Margin Used</div>
+        <div style="font-size:20px;font-weight:900;color:var(--accent2)" id="ad-margin">—</div>
+        <div style="font-size:9px;color:var(--text3)">USDT</div>
+      </div>
+      <div class="ad-stat">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Unreal. PnL</div>
+        <div style="font-size:20px;font-weight:900" id="ad-pnl">—</div>
+        <div style="font-size:9px;color:var(--text3)">USDT</div>
+      </div>
+    </div>
+    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin:12px 0 8px">Open Positions</div>
+    <div id="ad-positions">
+      <div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">Loading…</div>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="closeAccountDetail()" style="margin-top:14px">Done</button>
+  </div>
+</div>
+
 <script>
 /* ── Theme ───────────────────────────────────────────── */
 const _th = localStorage.getItem('theme') || 'dark';
@@ -1383,7 +1503,7 @@ function render() {
   document.getElementById('s-losses').textContent = d.stats.losses;
   document.getElementById('s-total').textContent  = d.stats.total;
 
-  // Win rate
+  // Win rate + arc gauge
   const wr = d.stats.win_rate;
   document.getElementById('h-wr').textContent     = wr.toFixed(1) + '%';
   document.getElementById('h-wr-bar').style.width = Math.min(wr, 100) + '%';
@@ -1392,6 +1512,16 @@ function render() {
   const wb = document.getElementById('h-wr-badge');
   wb.textContent = pass ? '✅ PASSING' : '❌ FAILING';
   wb.className   = 'wr-badge ' + (pass ? 'wr-pass' : 'wr-fail');
+  // Arc gauge: total arc = 176, offset 176=empty 0=full
+  const arcEl = document.getElementById('h-wr-arc');
+  if (arcEl) {
+    const pct = Math.min(Math.max(wr, 0), 100) / 100;
+    arcEl.style.strokeDashoffset = (176 * (1 - pct)).toFixed(1);
+    arcEl.style.stroke = pass ? 'var(--green)' : 'var(--accent)';
+  }
+
+  // Home accounts (primary data is ready now)
+  renderHomeAccounts();
 
   // Config
   document.getElementById('cfg-auto').innerHTML = d.auto_execute
@@ -1774,6 +1904,7 @@ async function loadAccounts() {
   const r = await fetch('/api/accounts');
   _accounts = await r.json();
   renderAccList();
+  renderHomeAccounts();
 }
 function renderAccList() {
   const el = document.getElementById('acc-list');
@@ -1829,6 +1960,159 @@ async function fetchAccBal(id) {
     <div class="acc-meta"><div class="acc-meta-lbl">Balance</div><div class="acc-meta-val blue">${(b.equity||0).toFixed(2)}</div><div style="font-size:9px;color:var(--text3)">USDT</div></div>
     <div class="acc-meta"><div class="acc-meta-lbl">Unreal. PnL</div><div class="acc-meta-val ${pnl>=0?'pos':'neg'}">${(pnl>=0?'+':'')+pnl.toFixed(2)}</div><div style="font-size:9px;color:var(--text3)">USDT</div></div>`;
 }
+/* ── Home account cards ────────────────────────────────── */
+let _homeAccBalCache = {};
+
+function renderHomeAccounts() {
+  const el = document.getElementById('home-accounts');
+  if (!el) return;
+  const cards = [];
+
+  // Primary account card (from DATA)
+  if (DATA && DATA.account) {
+    const acc = DATA.account;
+    const eq = (acc.equity || 0).toFixed(2);
+    const pnl = acc.unrealised_pnl || acc.total_pnl || 0;
+    const pnlCls = pnl >= 0 ? 'pos' : 'neg';
+    const pnlTxt = (pnl >= 0 ? '+' : '') + pnl.toFixed(2);
+    cards.push(`<div class="acct-mini" onclick="openAccountDetail('primary')">
+      <div class="acct-mini-icon">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="var(--accent)" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="acct-mini-body" style="flex:1">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+          <span class="acct-mini-name">Primary</span>
+          <span class="badge-live">LIVE</span>
+        </div>
+        <div class="acct-mini-eq">${eq} <span style="font-size:10px;font-weight:600;color:var(--text3)">USDT</span></div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:1px">PnL</div>
+        <div style="font-size:13px;font-weight:800" class="${pnlCls}">${pnlTxt}</div>
+      </div>
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="var(--text3)" stroke-width="2.5" style="margin-left:6px;flex-shrink:0"><polyline stroke-linecap="round" stroke-linejoin="round" points="9 18 15 12 9 6"/></svg>
+    </div>`);
+  }
+
+  // Extra accounts
+  _accounts.forEach(a => {
+    if (!a.enabled && a.enabled !== undefined) return;
+    const cached = _homeAccBalCache[a.id] || {};
+    const eq = cached.equity != null ? cached.equity.toFixed(2) : '—';
+    const pnl = cached.unrealised_pnl != null ? cached.unrealised_pnl : null;
+    const pnlTxt = pnl != null ? ((pnl >= 0 ? '+' : '') + pnl.toFixed(2)) : '—';
+    const pnlCls = pnl != null ? (pnl >= 0 ? 'pos' : 'neg') : '';
+    const isDemo = a.testnet || false;
+    cards.push(`<div class="acct-mini ${isDemo?'demo':''}" onclick="openAccountDetail('${a.id}')">
+      <div class="acct-mini-icon" style="${isDemo?'background:var(--cyanbg)':''}">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="${isDemo?'var(--cyan)':'var(--accent)'}" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke-linecap="round" stroke-linejoin="round"/><path stroke-linecap="round" stroke-linejoin="round" d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </div>
+      <div class="acct-mini-body" style="flex:1">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px">
+          <span class="acct-mini-name">${a.name}</span>
+          ${isDemo ? '<span class="badge-demo">DEMO</span>' : '<span class="badge-live">LIVE</span>'}
+        </div>
+        <div class="acct-mini-eq">${eq} <span style="font-size:10px;font-weight:600;color:var(--text3)">USDT</span></div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:1px">PnL</div>
+        <div style="font-size:13px;font-weight:800" class="${pnlCls}">${pnlTxt}</div>
+      </div>
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="var(--text3)" stroke-width="2.5" style="margin-left:6px;flex-shrink:0"><polyline stroke-linecap="round" stroke-linejoin="round" points="9 18 15 12 9 6"/></svg>
+    </div>`);
+  });
+
+  el.innerHTML = cards.length ? cards.join('') : '<div class="acct-mini" style="opacity:.5;cursor:default"><div class="acct-mini-body"><div class="acct-mini-name" style="color:var(--text3)">No accounts configured</div></div></div>';
+}
+
+async function openAccountDetail(id) {
+  const ov = document.getElementById('ad-overlay');
+  ov.classList.add('open');
+
+  let name, isDemo, balData;
+  if (id === 'primary') {
+    name = 'Primary';
+    isDemo = false;
+    balData = DATA ? {
+      equity: DATA.account.equity,
+      available: DATA.account.available,
+      used_margin: DATA.account.used_margin,
+      unrealised_pnl: DATA.account.unrealised_pnl || DATA.account.total_pnl || 0
+    } : null;
+  } else {
+    const acc = _accounts.find(a => a.id === id);
+    name = acc ? acc.name : id;
+    isDemo = acc ? (acc.testnet || false) : false;
+    balData = _homeAccBalCache[id] || null;
+  }
+
+  document.getElementById('ad-name').textContent = name;
+  const badgeWrap = document.getElementById('ad-badge-wrap');
+  badgeWrap.innerHTML = isDemo ? '<span class="badge-demo">DEMO</span>' : '<span class="badge-live">LIVE</span>';
+
+  // Render positions for this account
+  const adPos = document.getElementById('ad-positions');
+  const myPos = _allPositions.filter(p => id === 'primary' ? p.account_id === 'primary' : p.account_id === id);
+  if (myPos.length) {
+    adPos.innerHTML = myPos.map(p => {
+      const pnl = p.unrealised_pnl || 0;
+      const pnlCls = pnl >= 0 ? 'pos' : 'neg';
+      return `<div class="ad-pos-item">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:13px;font-weight:900">${p.symbol.replace('USDT','')}</span>
+          <span class="tag ${p.side==='Buy'?'green':'red'}" style="font-size:9px">${p.side==='Buy'?'LONG':'SHORT'}</span>
+          <span class="tag blue" style="font-size:9px">${p.leverage}×</span>
+          <span style="flex:1"></span>
+          <span class="${pnlCls}" style="font-size:12px;font-weight:800">${(pnl>=0?'+':'')+pnl.toFixed(2)}</span>
+        </div>
+        <div style="display:flex;gap:12px;margin-top:5px;font-size:10px;color:var(--text3)">
+          <span>Entry: ${parseFloat(p.entry_price).toFixed(4)}</span>
+          <span>Size: ${p.size}</span>
+        </div>
+        <button class="btn btn-red btn-sm" style="margin-top:8px;font-size:11px" onclick="closeAccountDetail();setTimeout(()=>closePosition(${_allPositions.indexOf(p)}),200)">
+          ✕ Close
+        </button>
+      </div>`;
+    }).join('');
+  } else {
+    adPos.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">No open positions</div>';
+  }
+
+  // Load balance if not cached or is primary (already have it)
+  if (balData) {
+    _renderAdBal(balData);
+  } else {
+    document.getElementById('ad-equity').textContent = '…';
+    document.getElementById('ad-avail').textContent  = '…';
+    document.getElementById('ad-margin').textContent = '…';
+    document.getElementById('ad-pnl').textContent    = '…';
+    try {
+      const r = await fetch('/api/accounts/' + id + '/balance');
+      const b = await r.json();
+      _homeAccBalCache[id] = b;
+      _renderAdBal(b);
+    } catch(e) {
+      document.getElementById('ad-equity').textContent = 'Error';
+    }
+  }
+}
+
+function _renderAdBal(b) {
+  document.getElementById('ad-equity').textContent = (b.equity||0).toFixed(2);
+  document.getElementById('ad-avail').textContent  = (b.available||0).toFixed(2);
+  document.getElementById('ad-margin').textContent = (b.used_margin||0).toFixed(2);
+  const pnl = b.unrealised_pnl || 0;
+  const pnlEl = document.getElementById('ad-pnl');
+  pnlEl.textContent = (pnl>=0?'+':'')+pnl.toFixed(2);
+  pnlEl.className   = pnl >= 0 ? 'pos' : 'neg';
+  pnlEl.style.fontSize = '20px';
+  pnlEl.style.fontWeight = '900';
+}
+
+function closeAccountDetail() {
+  document.getElementById('ad-overlay').classList.remove('open');
+}
+
 function openAddAccount() {
   document.getElementById('modal-title-txt').textContent = 'Add Account';
   ['m-name','m-key','m-secret','m-note'].forEach(i => document.getElementById(i).value = '');
