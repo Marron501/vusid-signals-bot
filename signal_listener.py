@@ -316,7 +316,7 @@ class SignalExecutor:
     def _open(self, signal: dict) -> bool:
         symbol   = signal["symbol"]
         side     = signal["side"]
-        leverage = Decimal(str(config.DEFAULT_LEVERAGE))
+        leverage = Decimal(str(signal.get("leverage") or config.DEFAULT_LEVERAGE))
 
         try:
             equity = self.executor.get_equity()
@@ -325,8 +325,42 @@ class SignalExecutor:
             logger.error(self.last_error)
             return False
 
-        cost = equity * Decimal(str(config.EQUITY_FRACTION))
-        logger.info(f"Sizing: equity={equity:.2f} | {config.EQUITY_FRACTION*100:.0f}% = {cost:.2f} USDT | {leverage}x")
+        # ── Phase-adjusted risk percentage ────────────────────────────────
+        eq_f = float(equity)
+        base_risk = config.RISK_PCT
+        if eq_f >= config.PHASE_3_EQUITY:
+            risk_pct = base_risk * 2.5
+            phase    = 3
+        elif eq_f >= config.PHASE_2_EQUITY:
+            risk_pct = base_risk * 1.5
+            phase    = 2
+        else:
+            risk_pct = base_risk
+            phase    = 1
+
+        # ── SL-aware position sizing ──────────────────────────────────────
+        sl_raw  = signal.get("stop_loss")
+        sl_f    = float(sl_raw) if sl_raw else None
+        try:
+            entry_f = float(self.executor.get_mark_price(symbol))
+        except Exception:
+            entry_f = 0.0
+
+        if sl_f and entry_f and entry_f > 0:
+            sl_dist = abs(entry_f - sl_f) / entry_f   # e.g. 0.03 for 3%
+            sl_dist = max(sl_dist, 0.005)              # floor at 0.5% to avoid division issues
+        else:
+            sl_dist = config.AUTO_SL_PCT               # fallback: 3% default
+
+        risk_amount       = equity * Decimal(str(risk_pct))
+        position_notional = risk_amount / Decimal(str(sl_dist))
+        cost              = position_notional / leverage
+
+        logger.info(
+            f"[Phase {phase}] equity={eq_f:.2f} | risk={risk_pct*100:.1f}% (${float(risk_amount):.2f}) | "
+            f"SL_dist={sl_dist*100:.2f}% | notional=${float(position_notional):.2f} | "
+            f"margin=${float(cost):.2f} | {leverage}x"
+        )
 
         # Pre-check: calculate qty before even attempting — gives a clear error
         qty = self.executor.calculate_qty(symbol, cost, leverage)
@@ -349,6 +383,19 @@ class SignalExecutor:
                 if ok:
                     self.optimizer.record_trade(symbol, side, "open", cost, leverage)
                     logger.info(f"OPENED ✅ {side} {symbol} (attempt {attempt})")
+                    # ── Auto-SL: set stop loss if signal didn't include one ─
+                    if not sl_f and entry_f and config.AUTO_SL_PCT > 0:
+                        try:
+                            current = float(self.executor.get_mark_price(symbol))
+                            auto_sl = current * (1 - config.AUTO_SL_PCT) if side == "Buy" \
+                                      else current * (1 + config.AUTO_SL_PCT)
+                            self.executor.set_trading_stop(symbol, side, stop_loss=round(auto_sl, 6))
+                            logger.info(
+                                f"[AUTO-SL] Set {side} {symbol} SL={auto_sl:.6f} "
+                                f"({config.AUTO_SL_PCT*100:.1f}% from entry)"
+                            )
+                        except Exception as _sl_e:
+                            logger.warning(f"[AUTO-SL] Failed to set SL for {symbol}: {_sl_e}")
                     self.last_error = ""
                     return True
                 last_api_err = "place_order returned False"
@@ -600,6 +647,7 @@ class DiscordSignalClient(discord.Client):
                     logger.info(f"Win rate {win_pct} ✅ — executing")
 
                 # ── AI signal analysis (non-blocking) ────────────────────
+                analysis = None
                 if signal["action"] == "open":
                     try:
                         from signal_analyzer import analyze_signal as _analyse
@@ -614,6 +662,29 @@ class DiscordSignalClient(discord.Client):
                         )
                     except Exception as _ae:
                         logger.warning(f"[AI] analysis skipped: {_ae}")
+
+                # ── Score gate ────────────────────────────────────────────
+                if signal["action"] == "open" and config.MIN_AI_SCORE > 0 and analysis:
+                    score = analysis.get("score", 0)
+                    if score < config.MIN_AI_SCORE:
+                        reason = (
+                            f"AI score {score}/100 below threshold {config.MIN_AI_SCORE} "
+                            f"— verdict: {analysis.get('verdict','?')} | {analysis.get('recommendation','?')}"
+                        )
+                        log_entry["reason"] = reason
+                        logger.warning(f"SCORE GATE: {reason}")
+                        _save_signal(log_entry)
+                        _entry_saved = True
+                        _push_sse({"type": "signal", "entry": log_entry})
+                        await self._dm_owner(
+                            f"🧠 **Signal FILTERED by AI Score**\n"
+                            f"────────────────────\n"
+                            f"Symbol: **{signal.get('side','')} {signal.get('symbol','')}**\n"
+                            f"Score: `{score}/100` (need ≥ {config.MIN_AI_SCORE})\n"
+                            f"Verdict: `{analysis.get('verdict','?')}`\n"
+                            f"Reason: {analysis.get('summary','')[:120]}"
+                        )
+                        continue
 
                 # ── Execute ───────────────────────────────────────────────
                 exec_error = ""

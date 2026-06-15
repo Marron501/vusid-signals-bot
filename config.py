@@ -53,3 +53,23 @@ BYBIT_PROXY_URL = os.getenv("BYBIT_PROXY_URL", "").strip()
 
 # --- Anthropic AI (signal analysis) -----------------------------------------
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+
+# --- Risk management strategy ------------------------------------------------
+# MIN_AI_SCORE: signals scoring below this are logged but NOT executed.
+# Set to 0 to disable the filter entirely.
+MIN_AI_SCORE     = int(os.getenv("MIN_AI_SCORE", "60"))
+
+# RISK_PCT: fraction of account to risk on a single trade (e.g. 0.02 = 2%).
+# Position size is back-calculated from this + SL distance so risk is fixed.
+RISK_PCT         = float(os.getenv("RISK_PCT", "0.02"))
+
+# AUTO_SL_PCT: if a signal has no stop loss, set one this far from entry.
+# e.g. 0.03 = 3% below entry for longs, 3% above for shorts.
+AUTO_SL_PCT      = float(os.getenv("AUTO_SL_PCT", "0.03"))
+
+# PHASE_THRESHOLDS: equity levels (USDT) that trigger risk tier upgrades.
+# Phase 1 (0→750): RISK_PCT used as-is.
+# Phase 2 (750→1500): risk multiplied by 1.5×.
+# Phase 3 (1500+): risk multiplied by 2.5×.
+PHASE_2_EQUITY   = float(os.getenv("PHASE_2_EQUITY", "750"))
+PHASE_3_EQUITY   = float(os.getenv("PHASE_3_EQUITY", "1500"))

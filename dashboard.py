@@ -321,6 +321,11 @@ def api_status():
         "default_leverage": cfg.DEFAULT_LEVERAGE,
         "signal_channel":   cfg.SIGNAL_CHANNEL,
         "auto_execute":     cfg.AUTO_EXECUTE,
+        "risk_pct":         cfg.RISK_PCT,
+        "auto_sl_pct":      cfg.AUTO_SL_PCT,
+        "min_ai_score":     cfg.MIN_AI_SCORE,
+        "phase_2_equity":   cfg.PHASE_2_EQUITY,
+        "phase_3_equity":   cfg.PHASE_3_EQUITY,
     })
 
 
@@ -384,9 +389,20 @@ def api_settings():
     if "default_leverage" in d:
         v = float(d["default_leverage"])
         if 1 <= v <= 100: c.DEFAULT_LEVERAGE = v
+    if "risk_pct" in d:
+        v = float(d["risk_pct"])
+        if 0 < v <= 0.20: c.RISK_PCT = v
+    if "auto_sl_pct" in d:
+        v = float(d["auto_sl_pct"])
+        if 0 < v <= 0.20: c.AUTO_SL_PCT = v
+    if "min_ai_score" in d:
+        v = int(d["min_ai_score"])
+        if 0 <= v <= 100: c.MIN_AI_SCORE = v
     return jsonify({"success": True, "auto_execute": c.AUTO_EXECUTE,
                     "equity_fraction": c.EQUITY_FRACTION,
-                    "default_leverage": c.DEFAULT_LEVERAGE})
+                    "default_leverage": c.DEFAULT_LEVERAGE,
+                    "risk_pct": c.RISK_PCT, "auto_sl_pct": c.AUTO_SL_PCT,
+                    "min_ai_score": c.MIN_AI_SCORE})
 
 
 # ── Account management ────────────────────────────────────────────────────────
@@ -1358,20 +1374,40 @@ select.inp option{background:var(--card);color:var(--text)}
       <!-- hidden elements kept for JS compat -->
       <div style="display:none" id="h-wr-bar"></div>
       <div style="display:none" id="h-wr-sub"></div>
-      <div class="card" style="margin-bottom:0;padding:10px 12px">
-        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">
-          <span style="color:var(--text3)">Auto Execute</span>
-          <span id="cfg-auto" style="font-weight:700">—</span>
+      <!-- Phase Tracker card -->
+      <div class="card" style="margin-bottom:0;padding:10px 12px" id="phase-card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+          <span style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--text3)">RISK STRATEGY</span>
+          <span id="phase-badge" style="font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;
+            background:var(--accentbg);color:var(--accent2)">Phase —</span>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:4px">
-          <span style="color:var(--text3)">Equity / Trade</span>
-          <span id="cfg-eq" style="font-weight:700">—</span>
+        <div id="phase-bar-wrap" style="height:4px;background:var(--border);border-radius:2px;margin-bottom:6px;overflow:hidden">
+          <div id="phase-bar" style="height:100%;background:var(--accent);border-radius:2px;
+            transition:width .6s ease;width:0%"></div>
         </div>
-        <div style="display:flex;justify-content:space-between;font-size:11px">
-          <span style="color:var(--text3)">Leverage</span>
-          <span id="cfg-lev" style="font-weight:700">—</span>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:5px">
+          <span id="phase-eq-lbl">$— of $—</span>
+          <span id="phase-next-lbl"></span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px">
+          <div style="text-align:center;background:var(--card2);border-radius:6px;padding:4px 2px">
+            <div style="font-size:11px;font-weight:800;color:var(--accent2)" id="ph-risk">—</div>
+            <div style="font-size:9px;color:var(--text3)">Risk/trade</div>
+          </div>
+          <div style="text-align:center;background:var(--card2);border-radius:6px;padding:4px 2px">
+            <div style="font-size:11px;font-weight:800;color:var(--cyan)" id="ph-score">—</div>
+            <div style="font-size:9px;color:var(--text3)">Score gate</div>
+          </div>
+          <div style="text-align:center;background:var(--card2);border-radius:6px;padding:4px 2px">
+            <div style="font-size:11px;font-weight:800;color:var(--text2)" id="ph-sl">—</div>
+            <div style="font-size:9px;color:var(--text3)">Auto-SL</div>
+          </div>
         </div>
       </div>
+      <!-- hidden elements kept for JS compat -->
+      <div style="display:none" id="cfg-auto"></div>
+      <div style="display:none" id="cfg-eq"></div>
+      <div style="display:none" id="cfg-lev"></div>
     </div>
   </div>
 
@@ -1577,8 +1613,32 @@ select.inp option{background:var(--card);color:var(--text)}
     <label class="switch"><input type="checkbox" id="tog-auto" onchange="setAutoExecute(this)"><span class="sw-track"></span></label>
   </div>
   <div class="inp-grid mb">
-    <div class="inp-wrap"><label class="inp-lbl">Equity % / trade</label><input class="inp" type="number" id="inp-eq" min="1" max="100" placeholder="10"></div>
     <div class="inp-wrap"><label class="inp-lbl">Leverage (×)</label><input class="inp" type="number" id="inp-lev" min="1" max="100" placeholder="5"></div>
+    <div class="inp-wrap"><label class="inp-lbl" style="display:none">Equity %</label><input class="inp" type="number" id="inp-eq" min="1" max="100" placeholder="10" style="display:none"></div>
+  </div>
+
+  <div class="div"></div>
+  <div class="section-lbl">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+    Risk Strategy
+  </div>
+  <div style="background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:var(--text3);line-height:1.6">
+    Position size is calculated from your risk %, not equity %. If risk=2% and SL=3% from entry,
+    the bot sizes the position so a SL hit costs exactly 2% of your account.
+  </div>
+  <div class="inp-grid mb">
+    <div class="inp-wrap">
+      <label class="inp-lbl">Risk % / trade</label>
+      <input class="inp" type="number" id="inp-risk" min="0.5" max="10" step="0.5" placeholder="2">
+    </div>
+    <div class="inp-wrap">
+      <label class="inp-lbl">Auto-SL %</label>
+      <input class="inp" type="number" id="inp-sl" min="1" max="10" step="0.5" placeholder="3">
+    </div>
+  </div>
+  <div class="inp-wrap mb">
+    <label class="inp-lbl">AI Score Gate (0 = disabled)</label>
+    <input class="inp" type="number" id="inp-score" min="0" max="100" placeholder="60">
   </div>
   <button class="btn btn-primary mb" onclick="applySettings()">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
@@ -2028,8 +2088,11 @@ function render() {
   document.getElementById('cfg-lev').textContent = d.default_leverage + '× cross';
   document.getElementById('cfg-ts').textContent  = new Date(d.timestamp).toLocaleTimeString();
   document.getElementById('tog-auto').checked    = d.auto_execute;
-  if (!document.getElementById('inp-eq').value)  document.getElementById('inp-eq').value  = (d.equity_fraction*100).toFixed(0);
-  if (!document.getElementById('inp-lev').value) document.getElementById('inp-lev').value = d.default_leverage;
+  if (!document.getElementById('inp-eq').value)    document.getElementById('inp-eq').value    = (d.equity_fraction*100).toFixed(0);
+  if (!document.getElementById('inp-lev').value)   document.getElementById('inp-lev').value   = d.default_leverage;
+  if (!document.getElementById('inp-risk').value)  document.getElementById('inp-risk').value  = ((d.risk_pct||0.02)*100).toFixed(1);
+  if (!document.getElementById('inp-sl').value)    document.getElementById('inp-sl').value    = ((d.auto_sl_pct||0.03)*100).toFixed(0);
+  if (!document.getElementById('inp-score').value) document.getElementById('inp-score').value = d.min_ai_score ?? 60;
 
   // Accounts page — primary
   document.getElementById('pa-equity').textContent = acc.equity.toFixed(2);
@@ -2043,6 +2106,7 @@ function render() {
   renderHistory(d.history || []);
   renderSignals();
   renderHomeAI();
+  renderPhase(d, acc.equity || 0);
 
   allLogs = d.logs || [];
   document.getElementById('log-count').textContent = allLogs.length;
@@ -2506,6 +2570,53 @@ function _renderAnalysis(a) {
       ${factors || '<div style="font-size:11px;color:var(--text3)">No factors available</div>'}
     </div>
   </div>`;
+}
+
+/* ── Phase Tracker ───────────────────────────────────── */
+function renderPhase(d, equity) {
+  const p2    = d.phase_2_equity || 750;
+  const p3    = d.phase_3_equity || 1500;
+  const base  = d.risk_pct  || 0.02;
+  const sl    = d.auto_sl_pct || 0.03;
+  const score = d.min_ai_score || 60;
+
+  let phase, riskMult, nextTarget, phaseColor;
+  if (equity >= p3) {
+    phase = 3; riskMult = 2.5; nextTarget = null; phaseColor = '#22c55e';
+  } else if (equity >= p2) {
+    phase = 2; riskMult = 1.5; nextTarget = p3; phaseColor = 'var(--accent)';
+  } else {
+    phase = 1; riskMult = 1.0; nextTarget = p2; phaseColor = 'var(--cyan)';
+  }
+  const effectiveRisk = (base * riskMult * 100).toFixed(1);
+  const scoreGate     = phase === 1 ? score : phase === 2 ? Math.max(score, 65) : Math.max(score, 70);
+
+  // Progress bar
+  let pct = 0;
+  if (phase === 1)      pct = Math.min(100, (equity / p2) * 100);
+  else if (phase === 2) pct = Math.min(100, ((equity - p2) / (p3 - p2)) * 100);
+  else                  pct = 100;
+
+  const badge = document.getElementById('phase-badge');
+  const bar   = document.getElementById('phase-bar');
+  if (badge) {
+    badge.textContent    = `Phase ${phase}`;
+    badge.style.background = phase === 1 ? 'rgba(6,182,212,.15)' : phase === 2 ? 'var(--accentbg)' : 'rgba(34,197,94,.15)';
+    badge.style.color      = phaseColor;
+  }
+  if (bar) { bar.style.width = pct.toFixed(1) + '%'; bar.style.background = phaseColor; }
+
+  const eqLbl   = document.getElementById('phase-eq-lbl');
+  const nextLbl  = document.getElementById('phase-next-lbl');
+  if (eqLbl)  eqLbl.textContent  = `$${equity.toFixed(0)} equity`;
+  if (nextLbl) nextLbl.textContent = nextTarget
+    ? `→ $${nextTarget} unlocks Phase ${phase+1}`
+    : '🏆 Max phase reached';
+
+  const ph = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  ph('ph-risk',  effectiveRisk + '%');
+  ph('ph-score', scoreGate + '+');
+  ph('ph-sl',    (sl * 100).toFixed(0) + '%');
 }
 
 function renderHomeAI() {
@@ -2988,12 +3099,18 @@ async function setAutoExecute(el) {
   countdown = 2;
 }
 async function applySettings() {
-  const eq = parseFloat(document.getElementById('inp-eq').value) / 100;
-  const lv = parseFloat(document.getElementById('inp-lev').value);
-  if (!eq || eq <= 0 || eq > 1 || !lv || lv < 1) { toast('Invalid values', false); return; }
+  const lv    = parseFloat(document.getElementById('inp-lev').value);
+  const risk  = parseFloat(document.getElementById('inp-risk').value) / 100;
+  const sl    = parseFloat(document.getElementById('inp-sl').value) / 100;
+  const score = parseInt(document.getElementById('inp-score').value);
+  if (!lv || lv < 1) { toast('Invalid leverage', false); return; }
+  const body = {default_leverage: lv};
+  if (risk > 0 && risk <= 0.20)  body.risk_pct      = risk;
+  if (sl > 0 && sl <= 0.20)      body.auto_sl_pct   = sl;
+  if (!isNaN(score) && score >= 0 && score <= 100) body.min_ai_score = score;
   await fetch('/api/settings', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({equity_fraction: eq, default_leverage: lv})});
-  toast(`✅ ${(eq*100).toFixed(0)}% equity · ${lv}× applied`);
+    body: JSON.stringify(body)});
+  toast(`✅ ${lv}× lev · ${((risk||0.02)*100).toFixed(1)}% risk · score≥${score||60} applied`);
   countdown = 2;
 }
 async function openTrade() {
