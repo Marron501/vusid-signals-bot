@@ -604,27 +604,31 @@ _mkt_cache = {"data": [], "ts": 0}
 
 @app.route("/api/market-ticker")
 def api_market_ticker():
-    """Top 20 USDT perpetuals by 24h volume with price & change — cached 60s."""
+    """Top 5 gainers + top 5 losers from USDT perpetuals — cached 30s."""
     import time, requests as _req
     global _mkt_cache
-    if time.time() - _mkt_cache["ts"] < 60 and _mkt_cache["data"]:
+    if time.time() - _mkt_cache["ts"] < 30 and _mkt_cache["data"]:
         return jsonify(_mkt_cache["data"])
     try:
         r = _req.get("https://api.bybit.com/v5/market/tickers?category=linear", timeout=10)
         items = r.json().get("result", {}).get("list", [])
-        usdt  = [t for t in items if t["symbol"].endswith("USDT")]
-        usdt.sort(key=lambda x: float(x.get("volume24h") or 0), reverse=True)
-        top   = [{
+        usdt  = [t for t in items if t["symbol"].endswith("USDT")
+                 and float(t.get("volume24h") or 0) > 500000]
+        mapped = [{
             "symbol": t["symbol"].replace("USDT", ""),
             "price":  float(t.get("lastPrice") or 0),
             "change": round(float(t.get("price24hPcnt") or 0) * 100, 2),
             "vol":    float(t.get("volume24h") or 0),
-        } for t in usdt[:20]]
-        _mkt_cache = {"data": top, "ts": time.time()}
-        return jsonify(top)
+        } for t in usdt]
+        mapped.sort(key=lambda x: x["change"], reverse=True)
+        gainers = mapped[:5]
+        losers  = list(reversed(mapped[-5:]))
+        result  = {"gainers": gainers, "losers": losers, "ts": time.time()}
+        _mkt_cache = {"data": result, "ts": time.time()}
+        return jsonify(result)
     except Exception as e:
         log.error(f"market-ticker: {e}")
-        return jsonify(_mkt_cache["data"])
+        return jsonify(_mkt_cache["data"] or {"gainers": [], "losers": []})
 
 
 @app.route("/api/set-sl-tp", methods=["POST"])
@@ -1135,24 +1139,28 @@ select.inp option{background:var(--card);color:var(--text)}
 .ad-pos-pnl{font-size:13px;font-weight:800;text-align:right}
 
 /* ── MARKET TICKER RIBBON ────────────────────────────── */
-.ticker-ribbon{position:relative;overflow:hidden;height:32px;
-  background:var(--card);border-bottom:1px solid var(--border);
-  display:flex;align-items:center}
-.ticker-ribbon::before,.ticker-ribbon::after{content:'';position:absolute;top:0;bottom:0;
-  width:32px;z-index:2;pointer-events:none}
-.ticker-ribbon::before{left:0;background:linear-gradient(to right,var(--card),transparent)}
-.ticker-ribbon::after{right:0;background:linear-gradient(to left,var(--card),transparent)}
-.ticker-track{display:flex;align-items:center;white-space:nowrap;
-  animation:tickerScroll 60s linear infinite}
-.ticker-track:hover{animation-play-state:paused}
-.ticker-item{display:inline-flex;align-items:center;gap:5px;padding:0 16px;
-  font-size:11px;font-weight:700;flex-shrink:0}
-.ticker-sym{color:var(--text2);letter-spacing:.3px}
-.ticker-chg{font-size:10.5px;font-weight:800}
-.ticker-chg.up{color:var(--green)}
-.ticker-chg.dn{color:var(--red)}
-.ticker-dot{width:3px;height:3px;border-radius:50%;background:var(--border2);margin:0 2px}
-@keyframes tickerScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+.market-panel{display:grid;grid-template-columns:1fr 1fr;
+  background:var(--card);border-bottom:1px solid var(--border)}
+.market-col{padding:4px 0}
+.market-col:first-child{border-right:1px solid var(--border)}
+.market-col-hd{display:flex;align-items:center;gap:5px;
+  padding:4px 10px 3px;font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+.market-col-hd.gain{color:var(--green)}
+.market-col-hd.lose{color:var(--red)}
+.mkt-row{display:flex;align-items:center;justify-content:space-between;
+  padding:2px 10px;gap:6px;transition:background .1s}
+.mkt-row:hover{background:rgba(255,255,255,.04)}
+.mkt-left{display:flex;align-items:center;gap:5px;min-width:0}
+.mkt-sym{font-size:10.5px;font-weight:700;color:var(--text1);letter-spacing:.15px}
+.mkt-price{font-size:9px;color:var(--text3)}
+.mkt-chg{font-size:11px;font-weight:900;flex-shrink:0}
+.mkt-chg.up{color:var(--green)}
+.mkt-chg.dn{color:var(--red)}
+.mkt-pulse{display:inline-block;width:5px;height:5px;border-radius:50%;
+  flex-shrink:0;animation:mktPulse 2s ease-in-out infinite}
+.mkt-pulse.gain{background:var(--green)}
+.mkt-pulse.lose{background:var(--red)}
+@keyframes mktPulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.35;transform:scale(.6)}}
 
 /* ── AI ANALYSIS ─────────────────────────────────────── */
 .ai-badge{display:inline-flex;align-items:center;gap:4px;border-radius:8px;
@@ -1288,10 +1296,23 @@ select.inp option{background:var(--card);color:var(--text)}
   </div>
 </div>
 
-<!-- MARKET TICKER RIBBON -->
-<div class="ticker-ribbon" id="ticker-ribbon">
-  <div class="ticker-track" id="ticker-track">
-    <span class="ticker-item"><span class="ticker-sym">Loading…</span></span>
+<!-- MARKET PANEL: TOP GAINERS / LOSERS -->
+<div class="market-panel" id="market-panel">
+  <div class="market-col">
+    <div class="market-col-hd gain">
+      <span class="mkt-pulse gain"></span>Top Gainers
+    </div>
+    <div id="mkt-gainers">
+      <div class="mkt-row"><span class="mkt-sym" style="color:var(--text3)">Loading…</span></div>
+    </div>
+  </div>
+  <div class="market-col">
+    <div class="market-col-hd lose">
+      <span class="mkt-pulse lose"></span>Top Losers
+    </div>
+    <div id="mkt-losers">
+      <div class="mkt-row"><span class="mkt-sym" style="color:var(--text3)">Loading…</span></div>
+    </div>
   </div>
 </div>
 
@@ -2393,29 +2414,38 @@ function _sigBadge(s, isNew) {
   return '<span class="badge b-skip">⛔ Skipped</span>';
 }
 
-/* ── Market Ticker ───────────────────────────────────── */
+/* ── Market Panel (Gainers / Losers) ─────────────────── */
+function _fmtPrice(p) {
+  if (!p) return '';
+  if (p >= 1000)  return '$' + p.toLocaleString('en', {maximumFractionDigits: 0});
+  if (p >= 1)     return '$' + p.toFixed(3);
+  if (p >= 0.01)  return '$' + p.toFixed(4);
+  return '$' + p.toFixed(6);
+}
+function _renderMktRows(coins, type) {
+  if (!coins || !coins.length) return '<div class="mkt-row" style="color:var(--text3);font-size:11px">No data</div>';
+  return coins.map(c => {
+    const up  = c.change >= 0;
+    const cls = up ? 'up' : 'dn';
+    const arrow = up ? '▲' : '▼';
+    return `<div class="mkt-row">
+      <div class="mkt-left">
+        <span class="mkt-sym">${c.symbol}</span>
+        <span class="mkt-price">${_fmtPrice(c.price)}</span>
+      </div>
+      <span class="mkt-chg ${cls}">${arrow}${Math.abs(c.change).toFixed(2)}%</span>
+    </div>`;
+  }).join('');
+}
 async function loadTicker() {
   try {
-    const r = await fetch('/api/market-ticker');
-    const coins = await r.json();
-    if (!coins || !coins.length) return;
-    const items = coins.map(c => {
-      const up  = c.change >= 0;
-      const cls = up ? 'up' : 'dn';
-      const arrow = up ? '▲' : '▼';
-      return `<span class="ticker-item">
-        <span class="ticker-sym">${c.symbol}</span>
-        <span class="ticker-chg ${cls}">${arrow} ${Math.abs(c.change).toFixed(2)}%</span>
-        <span class="ticker-dot"></span>
-      </span>`;
-    });
-    const half = items.join('');
-    const track = document.getElementById('ticker-track');
-    if (track) {
-      track.innerHTML = half + half;
-      track.style.animationDuration = Math.max(45, coins.length * 3.2) + 's';
-    }
-  } catch(e) { console.error('[ticker]', e); }
+    const r    = await fetch('/api/market-ticker');
+    const data = await r.json();
+    const gEl  = document.getElementById('mkt-gainers');
+    const lEl  = document.getElementById('mkt-losers');
+    if (gEl && data.gainers) gEl.innerHTML = _renderMktRows(data.gainers, 'gain');
+    if (lEl && data.losers)  lEl.innerHTML = _renderMktRows(data.losers,  'lose');
+  } catch(e) { console.error('[market]', e); }
 }
 
 /* ── AI Analysis render ──────────────────────────────── */
