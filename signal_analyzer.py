@@ -217,3 +217,122 @@ def _rule_based(signal: dict, rr_val, rr_str: str, trend_align: str,
         "enabled":        True,
         "ai":             False,
     }
+
+
+# ── Momentum shift analysis ───────────────────────────────────────────────────
+
+def analyze_momentum(position: dict) -> dict:
+    """
+    Assess whether momentum has reversed against an open position.
+    Calls Claude for qualitative assessment; falls back to rule-based math.
+    Returns: {alert: bool, urgency: str, reason: str, action: "monitor"|"close_soon"|"close_now"}
+    IMPORTANT: This function NEVER closes positions — it only produces notifications.
+    """
+    api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
+    symbol  = position.get("symbol", "")
+    side    = position.get("side", "")       # "Buy" or "Sell"
+    pnl     = float(position.get("unrealisedPnl", 0))
+    lev     = float(position.get("leverage", 1))
+    entry   = float(position.get("avgPrice", 0))
+    sl      = position.get("stopLoss", "")
+    tp      = position.get("takeProfit", "")
+
+    md       = _get_market_data(symbol)
+    price_s  = md.get("lastPrice", "")
+    chg_s    = md.get("price24hPcnt", "")
+    vol_s    = md.get("volume24h", "")
+    high_s   = md.get("highPrice24h", "")
+    low_s    = md.get("lowPrice24h", "")
+
+    if not price_s:
+        return {"alert": False, "reason": "no market data"}
+
+    current = float(price_s)
+    chg_pct = float(chg_s) * 100 if chg_s else 0.0
+
+    # Rule-based reversal signals
+    reversal_signals = []
+
+    if side == "Buy":
+        if chg_pct < -3:
+            reversal_signals.append(f"24h price down {chg_pct:.1f}% — strong bearish momentum")
+        if pnl < 0 and abs(pnl) > 0.05 * entry:
+            reversal_signals.append(f"Position in loss (unrealised PnL: {pnl:.2f})")
+        if low_s and current <= float(low_s) * 1.005:
+            reversal_signals.append("Price near 24h low — potential breakdown")
+    else:  # Sell / Short
+        if chg_pct > 3:
+            reversal_signals.append(f"24h price up {chg_pct:.1f}% — strong bullish momentum against short")
+        if pnl < 0 and abs(pnl) > 0.05 * entry:
+            reversal_signals.append(f"Position in loss (unrealised PnL: {pnl:.2f})")
+        if high_s and current >= float(high_s) * 0.995:
+            reversal_signals.append("Price near 24h high — potential breakout against short")
+
+    if not reversal_signals:
+        return {"alert": False, "reason": "momentum stable"}
+
+    # Claude qualitative assessment
+    if api_key:
+        try:
+            import anthropic
+            direction = "LONG" if side == "Buy" else "SHORT"
+            prompt = f"""You are a risk manager monitoring an open crypto futures position.
+
+POSITION:
+  Symbol   : {symbol}
+  Direction: {direction}
+  Entry    : ${entry:.4f}
+  Current  : ${current:.4f}
+  Leverage : {lev}x
+  Stop Loss: {sl or 'not set'}
+  Take Profit: {tp or 'not set'}
+  Unrealised PnL: {pnl:.2f} USDT
+
+MARKET (24h):
+  24h Change: {chg_pct:+.2f}%
+  24h Volume: {float(vol_s)/1e6:.1f}M USD
+
+REVERSAL SIGNALS DETECTED:
+{chr(10).join(f'  • {s}' for s in reversal_signals)}
+
+Based on these conditions, assess whether the trader should:
+1. close_now  — momentum has clearly reversed, exit immediately
+2. close_soon — deteriorating, exit if confirmed in next 15 min
+3. monitor    — bearish signs but position still viable
+
+Return ONLY valid JSON (no markdown):
+{{"action":"close_soon","urgency":"high","reason":"24h momentum flipped bearish and position is now underwater with no stop loss — risk of larger loss is increasing","confidence":"high"}}
+
+action: close_now | close_soon | monitor"""
+
+            client  = anthropic.Anthropic(api_key=api_key)
+            message = client.messages.create(
+                model="claude-haiku-4-5-20251001",
+                max_tokens=200,
+                temperature=0.1,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            raw = message.content[0].text.strip()
+            m   = re.search(r"\{.*\}", raw, re.DOTALL)
+            obj = json.loads(m.group() if m else raw)
+            obj["alert"]   = obj.get("action") in ("close_now", "close_soon")
+            obj["symbol"]  = symbol
+            obj["signals"] = reversal_signals
+            obj["ai"]      = True
+            return obj
+        except Exception as e:
+            logger.error(f"[momentum] Claude error for {symbol}: {e}")
+
+    # Rule-based fallback
+    urgency = "high" if len(reversal_signals) >= 2 else "medium"
+    action  = "close_now" if len(reversal_signals) >= 3 else ("close_soon" if len(reversal_signals) >= 2 else "monitor")
+    return {
+        "alert":      True,
+        "action":     action,
+        "urgency":    urgency,
+        "reason":     " | ".join(reversal_signals),
+        "confidence": "medium",
+        "symbol":     symbol,
+        "signals":    reversal_signals,
+        "ai":         False,
+    }

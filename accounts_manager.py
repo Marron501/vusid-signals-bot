@@ -30,6 +30,7 @@ _DEFAULTS: dict = {
     "equity_fraction": 0.10,   # 10 % of equity per trade
     "leverage":        5,
     "enabled":         True,
+    "auto_execute":    True,   # execute signals automatically on this account
     "testnet":         False,
     "note":            "",
 }

@@ -59,8 +59,89 @@ def _keepalive_loop():
         time.sleep(240)
 
 
-threading.Thread(target=_run_bot_forever, daemon=True, name="bot").start()
-threading.Thread(target=_keepalive_loop,  daemon=True, name="keepalive").start()
+_momentum_alerts: list[dict] = []  # in-memory store, newest first
+_momentum_checked: dict[str, float] = {}  # symbol_side → last-checked timestamp
+
+def _momentum_monitor_loop():
+    """
+    Background thread: every 5 min, check every open position for momentum reversal.
+    Pushes SSE + DM when Claude detects close_now / close_soon conditions.
+    SAFETY: never executes closes — notification only.
+    """
+    import time as _t
+    _t.sleep(120)  # give bot time to start
+    while True:
+        try:
+            from signal_analyzer import analyze_momentum
+            from trade_executor import TradeExecutor
+            import config as cfg
+            positions_to_check = []
+
+            # Primary account
+            try:
+                ex = TradeExecutor()
+                for pos in ex.get_my_positions().values():
+                    positions_to_check.append({**pos, "account_name": "Primary"})
+            except Exception:
+                pass
+
+            # Extra accounts
+            try:
+                from accounts_manager import get_enabled_accounts
+                for acc in get_enabled_accounts():
+                    try:
+                        ex2 = TradeExecutor(api_key=acc["api_key"],
+                                            api_secret=acc["api_secret"],
+                                            testnet=acc.get("testnet", False))
+                        for pos in ex2.get_my_positions().values():
+                            positions_to_check.append({**pos, "account_name": acc.get("name", acc["id"])})
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+            for pos in positions_to_check:
+                key = f"{pos['symbol']}_{pos['side']}"
+                last = _momentum_checked.get(key, 0)
+                if _t.time() - last < 270:  # max once per ~4.5 min
+                    continue
+                _momentum_checked[key] = _t.time()
+                try:
+                    result = analyze_momentum(pos)
+                    if result.get("alert"):
+                        alert = {
+                            "type":         "momentum_alert",
+                            "ts":           datetime.now().isoformat(),
+                            "symbol":       pos["symbol"],
+                            "side":         pos["side"],
+                            "account":      pos.get("account_name", ""),
+                            "action":       result.get("action", "monitor"),
+                            "urgency":      result.get("urgency", "medium"),
+                            "reason":       result.get("reason", ""),
+                            "signals":      result.get("signals", []),
+                            "confidence":   result.get("confidence", ""),
+                            "ai":           result.get("ai", False),
+                            "pnl":          float(pos.get("unrealisedPnl", 0)),
+                        }
+                        _momentum_alerts.insert(0, alert)
+                        if len(_momentum_alerts) > 50:
+                            _momentum_alerts.pop()
+                        from signal_listener import _push_sse
+                        _push_sse(alert)
+                        log.warning(
+                            f"[MOMENTUM] {alert['symbol']} {alert['side']} — "
+                            f"{alert['action']} ({alert['urgency']}) | {alert['reason'][:80]}"
+                        )
+                except Exception as _me:
+                    log.debug(f"[MOMENTUM] check error {pos.get('symbol')}: {_me}")
+        except Exception as _outer:
+            log.error(f"[MOMENTUM] monitor loop error: {_outer}")
+        _t.sleep(300)
+
+
+threading.Thread(target=_run_bot_forever,      daemon=True, name="bot").start()
+threading.Thread(target=_keepalive_loop,       daemon=True, name="keepalive").start()
+threading.Thread(target=_momentum_monitor_loop, daemon=True, name="momentum").start()
 log.info(f"[PROLIFIC] Bot + keepalive threads started")
 log.info(f"[PROLIFIC] Data directory: {DATA_DIR}")
 log.info(f"[PROLIFIC] Signals file  : {SIGNALS_FILE}")
@@ -255,6 +336,11 @@ def api_signals():
     return jsonify({"signals": sigs, "total": total, "offset": offset, "limit": limit})
 
 
+@app.route("/api/momentum-alerts", methods=["GET"])
+def api_momentum_alerts():
+    return jsonify(_momentum_alerts[:20])
+
+
 @app.route("/api/reanalyze", methods=["POST"])
 def api_reanalyze():
     """Backfill AI analysis on any open-signal entries that don't have one yet."""
@@ -349,6 +435,18 @@ def api_toggle_account(acc_id):
     if not acc:
         return jsonify({"success": False, "error": "Not found"})
     return jsonify({"success": True, "enabled": acc["enabled"]})
+
+
+@app.route("/api/accounts/<acc_id>/auto-execute", methods=["POST"])
+def api_toggle_auto_execute(acc_id):
+    from accounts_manager import load_accounts, update_account
+    accounts = load_accounts()
+    acc = next((a for a in accounts if a["id"] == acc_id), None)
+    if not acc:
+        return jsonify({"success": False, "error": "Not found"})
+    new_val = not acc.get("auto_execute", True)
+    updated = update_account(acc_id, {"auto_execute": new_val})
+    return jsonify({"success": True, "auto_execute": new_val})
 
 
 @app.route("/api/accounts/<acc_id>/balance", methods=["GET"])
@@ -1092,6 +1190,24 @@ select.inp option{background:var(--card);color:var(--text)}
 .home-ai-card{background:var(--card);border:1px solid var(--border);border-radius:14px;
   padding:13px 14px;margin-bottom:8px;cursor:pointer;transition:all .15s}
 .home-ai-card:active{transform:scale(.98)}
+/* ── Score Guide ───── */
+.score-guide-row{display:grid;grid-template-columns:110px 60px 1fr;gap:4px 8px;
+  padding:5px 0;border-bottom:1px solid var(--border);align-items:center}
+.score-guide-row:last-child{border-bottom:none}
+.sg-label{font-size:11px;font-weight:700;color:var(--text1)}
+.sg-pts{font-size:11px;font-weight:800;text-align:right}
+.sg-desc{font-size:10px;color:var(--text3);line-height:1.4}
+/* ── Momentum Alert Card ─── */
+.mo-alert-card{border-radius:12px;padding:11px 13px;margin-bottom:8px;
+  border-left:3px solid var(--red);background:rgba(248,113,113,.07)}
+.mo-alert-card.urgency-medium{border-color:var(--yellow);background:rgba(251,191,36,.07)}
+.mo-alert-card.action-monitor{border-color:var(--border2);background:var(--card)}
+.mo-alert-head{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.mo-alert-sym{font-size:14px;font-weight:800;color:var(--text1)}
+.mo-alert-action{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;
+  background:rgba(248,113,113,.2);color:var(--red)}
+.mo-alert-action.action-close_soon{background:rgba(251,191,36,.2);color:var(--yellow)}
+.mo-alert-action.action-monitor{background:var(--border);color:var(--text3)}
 
 /* ── ANIMATED BACKGROUND ─────────────────────────────── */
 .bg-canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
@@ -1279,6 +1395,49 @@ select.inp option{background:var(--card);color:var(--text)}
   </div>
   <div class="home-ai-section" id="home-ai-section">
     <div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">No signals analysed yet</div>
+  </div>
+
+  <!-- MOMENTUM ALERTS -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin:14px 0 6px">
+    <div class="card-label" style="margin:0">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+      Momentum Alerts
+      <span id="home-mo-dot" class="nav-dot" style="display:none"></span>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="loadMomentumAlerts()" style="width:auto;padding:5px 10px;font-size:10px">Refresh ↺</button>
+  </div>
+  <div id="home-momentum-alerts">
+    <div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">No alerts — positions momentum is stable</div>
+  </div>
+
+  <!-- AI SCORE GUIDE -->
+  <div class="card-label" style="margin:14px 0 8px">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+    AI Score Guide
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div style="padding:10px 12px 6px;background:var(--card2)">
+      <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.08em">HOW SIGNALS ARE SCORED (0 – 100)</div>
+    </div>
+    <div style="padding:8px 12px 4px">
+      <div class="score-guide-row"><span class="sg-label">R:R ≥ 2:1</span><span class="sg-pts pos">+20 pts</span><span class="sg-desc">Reward far outweighs risk — ideal setup</span></div>
+      <div class="score-guide-row"><span class="sg-label">R:R 1:1 – 2:1</span><span class="sg-pts" style="color:var(--accent)">+10 pts</span><span class="sg-desc">Acceptable but not optimal</span></div>
+      <div class="score-guide-row"><span class="sg-label">R:R &lt; 1:1</span><span class="sg-pts neg">−15 pts</span><span class="sg-desc">Risk exceeds reward — red flag</span></div>
+      <div class="score-guide-row"><span class="sg-label">Stop Loss set</span><span class="sg-pts pos">+10 pts</span><span class="sg-desc">Downside is defined and managed</span></div>
+      <div class="score-guide-row"><span class="sg-label">Take Profit set</span><span class="sg-pts pos">+10 pts</span><span class="sg-desc">Exit plan exists — disciplined trade</span></div>
+      <div class="score-guide-row"><span class="sg-label">Trend alignment</span><span class="sg-pts pos">+15 pts</span><span class="sg-desc">Signal direction matches 24h momentum</span></div>
+      <div class="score-guide-row"><span class="sg-label">Trend counter</span><span class="sg-pts neg">−20 pts</span><span class="sg-desc">Fighting current market momentum</span></div>
+      <div class="score-guide-row"><span class="sg-label">Leverage ≤ 5×</span><span class="sg-pts pos">+5 pts</span><span class="sg-desc">Conservative — lower liquidation risk</span></div>
+      <div class="score-guide-row"><span class="sg-label">Leverage &gt; 15×</span><span class="sg-pts neg">−10 pts</span><span class="sg-desc">High risk of liquidation on volatility</span></div>
+      <div class="score-guide-row"><span class="sg-label">Volume &gt; $50M</span><span class="sg-pts pos">+5 pts</span><span class="sg-desc">Liquid market — tighter spreads</span></div>
+      <div class="score-guide-row"><span class="sg-label">Win rate &gt; 70%</span><span class="sg-pts pos">+5 pts</span><span class="sg-desc">Channel has strong historical accuracy</span></div>
+    </div>
+    <div style="padding:6px 12px 10px;display:flex;gap:8px;flex-wrap:wrap">
+      <span class="pill" style="background:rgba(0,200,83,.12);color:#00c853;border:1px solid rgba(0,200,83,.3)">≥ 80 — Strong Win</span>
+      <span class="pill" style="background:rgba(0,200,83,.08);color:#4caf50;border:1px solid rgba(0,200,83,.2)">75–79 — Likely Win</span>
+      <span class="pill" style="background:rgba(255,107,53,.1);color:var(--accent);border:1px solid rgba(255,107,53,.3)">60–74 — Neutral/Caution</span>
+      <span class="pill" style="background:rgba(244,67,54,.1);color:#ef5350;border:1px solid rgba(244,67,54,.3)">&lt;60 — Skip / Loss Risk</span>
+    </div>
   </div>
 
   <div class="countdown" id="cd">—</div>
@@ -1690,6 +1849,7 @@ let DATA = null, countdown = 12, activeTab = 'home', allLogs = [], logFilter = '
 let _accounts = [];
 let _sigFilter = 'all';
 let _sigOffset = 0;
+let _momentumAlerts = [];
 const _SIG_PAGE = 200;
 let _allPositions = [];
 let _posAccFilter = 'all';
@@ -1710,13 +1870,13 @@ function goTab(tab) {
 }
 
 /* ── Toast ───────────────────────────────────────────── */
-function toast(msg, ok = true) {
+function toast(msg, ok = true, dur = 3200) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.style.borderColor = ok ? 'rgba(34,197,94,.4)' : 'rgba(239,68,68,.4)';
   t.style.display = 'block';
   clearTimeout(t._tid);
-  t._tid = setTimeout(() => t.style.display = 'none', 3200);
+  t._tid = setTimeout(() => t.style.display = 'none', dur);
 }
 
 /* ── SSE ─────────────────────────────────────────────── */
@@ -1758,6 +1918,17 @@ function connectSSE() {
     if (ev.type === 'account_trade') {
       toast(`[${ev.account}] ${ev.status === 'opened' ? '✅' : '❌'} ${ev.side} ${ev.symbol}`,
             ev.status === 'opened');
+    }
+    if (ev.type === 'momentum_alert') {
+      const urgencyIcon = ev.urgency === 'high' ? '🔴' : '🟡';
+      const actionMap   = {close_now:'CLOSE NOW',close_soon:'CLOSE SOON',monitor:'Monitor'};
+      toast(`${urgencyIcon} ${actionMap[ev.action]||ev.action}: ${ev.symbol} — ${ev.reason.slice(0,60)}`, false, 6000);
+      // Push into alerts store and re-render
+      _momentumAlerts.unshift(ev);
+      if (_momentumAlerts.length > 20) _momentumAlerts.length = 20;
+      renderMomentumAlerts();
+      // Flash the nav dot on home tab
+      document.getElementById('home-mo-dot') && document.getElementById('home-mo-dot').classList.add('show');
     }
   };
   es.onerror = () => { es.close(); setTimeout(connectSSE, 5000); };
@@ -2349,6 +2520,54 @@ function renderHomeAI() {
   }).join('');
 }
 
+function renderMomentumAlerts() {
+  const el = document.getElementById('home-momentum-alerts');
+  if (!el) return;
+  if (!_momentumAlerts.length) {
+    el.innerHTML = `<div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">No alerts — positions momentum is stable</div>`;
+    return;
+  }
+  const urgencyIcon = u => u === 'high' ? '🔴' : u === 'medium' ? '🟡' : '🟢';
+  const actionLabel = a => ({close_now:'CLOSE NOW', close_soon:'CLOSE SOON', monitor:'Monitor'}[a] || a);
+  el.innerHTML = _momentumAlerts.slice(0, 5).map(a => {
+    const urg = a.urgency || 'medium';
+    const act = a.action  || 'monitor';
+    const ts  = a.ts ? new Date(a.ts).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+    return `<div class="mo-alert-card urgency-${urg} action-${act}">
+      <div class="mo-alert-head">
+        <span class="mo-alert-sym">${urgencyIcon(urg)} ${a.symbol}</span>
+        <span style="font-size:10px;color:var(--text3)">${a.side==='Buy'?'LONG':'SHORT'} · ${a.account||'Primary'}</span>
+        <span class="mo-alert-action action-${act}">${actionLabel(act)}</span>
+        <span style="margin-left:auto;font-size:10px;color:var(--text3)">${ts}</span>
+      </div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.5">${a.reason || ''}</div>
+      ${(a.signals||[]).length ? `<div style="margin-top:6px;display:flex;gap:5px;flex-wrap:wrap">
+        ${a.signals.map(s=>`<span class="pill pill-red" style="font-size:9px">${s.slice(0,50)}</span>`).join('')}
+      </div>` : ''}
+      ${a.action !== 'monitor' ? `<div style="margin-top:8px;display:flex;gap:6px">
+        <button class="btn btn-red btn-sm" onclick="manualCloseAlert('${a.symbol}','${a.side}')" style="font-size:10px;padding:6px 12px">
+          Close ${a.symbol}
+        </button>
+        <span style="font-size:9px;color:var(--text3);align-self:center">You must confirm — AI never auto-closes</span>
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+async function loadMomentumAlerts() {
+  try {
+    const r = await fetch('/api/momentum-alerts');
+    _momentumAlerts = await r.json();
+    renderMomentumAlerts();
+  } catch(e) {}
+}
+async function manualCloseAlert(symbol, side) {
+  if (!confirm(`Close ${side === 'Buy' ? 'LONG' : 'SHORT'} ${symbol}?`)) return;
+  const r = await fetch('/api/trade', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({action:'close', symbol, side})});
+  const d = await r.json();
+  toast(d.success ? `✅ Closed ${symbol}` : `❌ ${d.error||'Failed'}`, d.success);
+}
+
 function renderSignals() {
   const all = (DATA && DATA.signals) || [];
 
@@ -2469,6 +2688,7 @@ function renderAccList() {
   }
   el.innerHTML = _accounts.map(a => {
     const enabled = a.enabled !== false;
+    const autoEx  = a.auto_execute !== false;
     return `<div class="acc-card ${enabled?'':'disabled'}">
       <div class="top-stripe" style="${enabled?'':'background:var(--border)'}"></div>
       <div class="acc-head">
@@ -2490,10 +2710,17 @@ function renderAccList() {
       <div class="acc-badges">
         <span class="pill pill-blue">${(a.equity_fraction*100).toFixed(0)}% equity</span>
         <span class="pill pill-cyan">${a.leverage}× lev</span>
-        <span class="pill pill-gray">${a.testnet?'Testnet':'LIVE'}</span>
+        <span class="pill pill-gray">${a.testnet?'Demo':'LIVE'}</span>
         ${a.note?`<span class="pill pill-gray">${a.note.slice(0,22)}</span>`:''}
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="fetchAccBal('${a.id}')" style="margin-top:10px">
+      <div class="toggle-row" style="margin-top:10px;padding:8px 0;border-top:1px solid var(--border)">
+        <div class="toggle-info">
+          <strong style="font-size:12px">Auto Execute</strong>
+          <span style="font-size:10px">${autoEx?'Signals execute on this account':'Signals paused — review AI score first'}</span>
+        </div>
+        <label class="switch"><input type="checkbox" id="ae-${a.id}" ${autoEx?'checked':''} onchange="toggleAutoExec('${a.id}',this)"><span class="sw-track"></span></label>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="fetchAccBal('${a.id}')" style="margin-top:8px">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:12px;height:12px;stroke-width:2.5"><polyline stroke-linecap="round" stroke-linejoin="round" points="23 4 23 10 17 10"/><path stroke-linecap="round" stroke-linejoin="round" d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
         Load Balance
       </button>
@@ -2716,6 +2943,12 @@ async function toggleAcc(id, el) {
   toast(d.enabled ? '✅ Account enabled' : '🔕 Account disabled', d.enabled);
   loadAccounts();
 }
+async function toggleAutoExec(id, el) {
+  const r = await fetch('/api/accounts/' + id + '/auto-execute', {method:'POST'});
+  const d = await r.json();
+  toast(d.auto_execute ? '✅ Auto Execute ON for this account' : '⏸ Auto Execute OFF — signals paused', d.auto_execute);
+  loadAccounts();
+}
 
 /* ── Settings ────────────────────────────────────────── */
 async function setAutoExecute(el) {
@@ -2778,10 +3011,12 @@ fetchData();
 fetchPositions();
 loadAccounts();
 loadTicker();
+loadMomentumAlerts();
 connectSSE();
 setInterval(tick, 1000);
 setInterval(fetchPositions, 15000);
 setInterval(loadTicker, 60000);
+setInterval(loadMomentumAlerts, 300000);
 </script>
 </body>
 </html>"""

@@ -219,6 +219,7 @@ def _broadcast_to_additional_accounts(signal: dict) -> None:
     """
     Execute the signal on every additional account stored in accounts.json.
     Each account applies its own equity_fraction and leverage.
+    Respects per-account auto_execute flag — accounts with auto_execute=False are skipped.
     Runs in a background thread — never blocks the main signal queue.
     """
     try:
@@ -226,8 +227,14 @@ def _broadcast_to_additional_accounts(signal: dict) -> None:
         accounts = get_enabled_accounts()
         if not accounts:
             return
-        logger.info(f"[multi-account] Broadcasting to {len(accounts)} additional account(s)")
-        for acc in accounts:
+        active = [a for a in accounts if a.get("auto_execute", True)]
+        skipped = len(accounts) - len(active)
+        if skipped:
+            logger.info(f"[multi-account] {skipped} account(s) skipped (auto_execute=off)")
+        if not active:
+            return
+        logger.info(f"[multi-account] Broadcasting to {len(active)} additional account(s)")
+        for acc in active:
             try:
                 ex       = TradeExecutor(api_key=acc["api_key"], api_secret=acc["api_secret"],
                                          testnet=acc.get("testnet", False))
@@ -258,10 +265,12 @@ def _broadcast_to_additional_accounts(signal: dict) -> None:
 
 
 def _broadcast_close_to_additional_accounts(signal: dict) -> None:
-    """Close position on all additional accounts."""
+    """Close position on all additional accounts that have auto_execute enabled."""
     try:
         from accounts_manager import get_enabled_accounts
         for acc in get_enabled_accounts():
+            if not acc.get("auto_execute", True):
+                continue
             try:
                 ex   = TradeExecutor(api_key=acc["api_key"], api_secret=acc["api_secret"],
                                      testnet=acc.get("testnet", False))
@@ -640,13 +649,15 @@ class DiscordSignalClient(discord.Client):
                     except Exception:
                         pass
 
-            # Broadcast to additional accounts (non-blocking background thread)
-            if success and signal["action"] == "open":
+            # Broadcast to additional accounts — independent of primary success.
+            # Each account's auto_execute flag is checked inside the broadcast fn.
+            # SAFETY: AI analysis scores never trigger this path — only Discord signals do.
+            if signal["action"] == "open":
                 threading.Thread(
                     target=_broadcast_to_additional_accounts,
                     args=(signal,), daemon=True, name="multi-acct-open"
                 ).start()
-            elif success and signal["action"] in ("close", "close_all"):
+            elif signal["action"] in ("close", "close_all"):
                 threading.Thread(
                     target=_broadcast_close_to_additional_accounts,
                     args=(signal,), daemon=True, name="multi-acct-close"
