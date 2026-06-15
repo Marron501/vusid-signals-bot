@@ -437,6 +437,33 @@ def api_close_all():
         return jsonify({"success": False, "error": str(e)})
 
 
+_mkt_cache = {"data": [], "ts": 0}
+
+@app.route("/api/market-ticker")
+def api_market_ticker():
+    """Top 20 USDT perpetuals by 24h volume with price & change — cached 60s."""
+    import time, requests as _req
+    global _mkt_cache
+    if time.time() - _mkt_cache["ts"] < 60 and _mkt_cache["data"]:
+        return jsonify(_mkt_cache["data"])
+    try:
+        r = _req.get("https://api.bybit.com/v5/market/tickers?category=linear", timeout=10)
+        items = r.json().get("result", {}).get("list", [])
+        usdt  = [t for t in items if t["symbol"].endswith("USDT")]
+        usdt.sort(key=lambda x: float(x.get("volume24h") or 0), reverse=True)
+        top   = [{
+            "symbol": t["symbol"].replace("USDT", ""),
+            "price":  float(t.get("lastPrice") or 0),
+            "change": round(float(t.get("price24hPcnt") or 0) * 100, 2),
+            "vol":    float(t.get("volume24h") or 0),
+        } for t in usdt[:20]]
+        _mkt_cache = {"data": top, "ts": time.time()}
+        return jsonify(top)
+    except Exception as e:
+        log.error(f"market-ticker: {e}")
+        return jsonify(_mkt_cache["data"])
+
+
 @app.route("/api/set-sl-tp", methods=["POST"])
 def api_set_sl_tp():
     d      = request.get_json() or {}
@@ -944,6 +971,63 @@ select.inp option{background:var(--card);color:var(--text)}
 .ad-pos-sym{font-size:14px;font-weight:800}
 .ad-pos-pnl{font-size:13px;font-weight:800;text-align:right}
 
+/* ── MARKET TICKER RIBBON ────────────────────────────── */
+.ticker-ribbon{position:relative;overflow:hidden;height:32px;
+  background:var(--card);border-bottom:1px solid var(--border);
+  display:flex;align-items:center}
+.ticker-ribbon::before,.ticker-ribbon::after{content:'';position:absolute;top:0;bottom:0;
+  width:32px;z-index:2;pointer-events:none}
+.ticker-ribbon::before{left:0;background:linear-gradient(to right,var(--card),transparent)}
+.ticker-ribbon::after{right:0;background:linear-gradient(to left,var(--card),transparent)}
+.ticker-track{display:flex;align-items:center;white-space:nowrap;
+  animation:tickerScroll 60s linear infinite}
+.ticker-track:hover{animation-play-state:paused}
+.ticker-item{display:inline-flex;align-items:center;gap:5px;padding:0 16px;
+  font-size:11px;font-weight:700;flex-shrink:0}
+.ticker-sym{color:var(--text2);letter-spacing:.3px}
+.ticker-chg{font-size:10.5px;font-weight:800}
+.ticker-chg.up{color:var(--green)}
+.ticker-chg.dn{color:var(--red)}
+.ticker-dot{width:3px;height:3px;border-radius:50%;background:var(--border2);margin:0 2px}
+@keyframes tickerScroll{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+/* ── AI ANALYSIS ─────────────────────────────────────── */
+.ai-badge{display:inline-flex;align-items:center;gap:4px;border-radius:8px;
+  padding:3px 8px;font-size:10px;font-weight:800;letter-spacing:.3px;border:1px solid}
+.ai-badge.s-strong-win{background:rgba(74,222,128,.15);color:var(--green);border-color:var(--greenb)}
+.ai-badge.s-likely-win{background:rgba(74,222,128,.08);color:var(--green);border-color:rgba(74,222,128,.2)}
+.ai-badge.s-neutral{background:var(--yellowbg);color:var(--yellow);border-color:rgba(251,191,36,.3)}
+.ai-badge.s-likely-loss{background:rgba(248,113,113,.1);color:var(--red);border-color:var(--redb)}
+.ai-badge.s-strong-loss{background:rgba(248,113,113,.18);color:var(--red);border-color:var(--redb)}
+.ai-score-ring{position:relative;width:52px;height:52px;flex-shrink:0}
+.ai-score-ring svg{transform:rotate(-90deg)}
+.ai-score-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:13px;font-weight:900}
+.ai-panel{background:var(--card);border:1px solid var(--border);border-radius:14px;
+  margin-top:10px;overflow:hidden}
+.ai-panel-head{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer}
+.ai-panel-body{padding:0 14px 14px;display:none}
+.ai-panel.open .ai-panel-body{display:block}
+.ai-verdict-row{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.ai-rec{display:inline-flex;align-items:center;gap:5px;border-radius:8px;
+  padding:5px 12px;font-size:11px;font-weight:800;border:1px solid}
+.ai-rec.take{background:rgba(74,222,128,.12);color:var(--green);border-color:var(--greenb)}
+.ai-rec.caution{background:var(--yellowbg);color:var(--yellow);border-color:rgba(251,191,36,.3)}
+.ai-rec.skip{background:rgba(248,113,113,.12);color:var(--red);border-color:var(--redb)}
+.ai-factor{display:flex;align-items:flex-start;gap:6px;padding:5px 0;
+  border-bottom:1px solid var(--border);font-size:11px;color:var(--text2)}
+.ai-factor:last-child{border:none}
+.ai-factor-dot{width:6px;height:6px;border-radius:50%;background:var(--accent);
+  flex-shrink:0;margin-top:4px}
+.ai-meta-row{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.ai-meta-chip{background:var(--card2);border:1px solid var(--border);border-radius:6px;
+  padding:3px 8px;font-size:10px;font-weight:600;color:var(--text3)}
+.ai-summary{font-size:11.5px;color:var(--text2);margin:10px 0 6px;line-height:1.5}
+.home-ai-section{margin-top:4px}
+.home-ai-card{background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:13px 14px;margin-bottom:8px;cursor:pointer;transition:all .15s}
+.home-ai-card:active{transform:scale(.98)}
+
 /* ── ANIMATED BACKGROUND ─────────────────────────────── */
 .bg-canvas{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
 .bg-grid{position:absolute;inset:0;
@@ -1020,6 +1104,13 @@ select.inp option{background:var(--card);color:var(--text)}
       <span class="dot dot-off" id="dot"></span>
       <span class="status-txt" id="status-txt">—</span>
     </div>
+  </div>
+</div>
+
+<!-- MARKET TICKER RIBBON -->
+<div class="ticker-ribbon" id="ticker-ribbon">
+  <div class="ticker-track" id="ticker-track">
+    <span class="ticker-item"><span class="ticker-sym">Loading…</span></span>
   </div>
 </div>
 
@@ -1111,9 +1202,20 @@ select.inp option{background:var(--card);color:var(--text)}
   </div>
 
   <!-- Config detail row (hidden fields kept for JS compat) -->
-  <div style="display:none">
-    <span id="cfg-ts">—</span>
+  <div style="display:none"><span id="cfg-ts">—</span></div>
+
+  <!-- AI Signal Analysis section -->
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:14px 0 8px">
+    <div class="section-lbl" style="margin-bottom:0">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2"/></svg>
+      AI Analysis
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="goTab('signals')" style="width:auto;padding:5px 10px;font-size:10px">All Signals ›</button>
   </div>
+  <div class="home-ai-section" id="home-ai-section">
+    <div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">No signals analysed yet</div>
+  </div>
+
   <div class="countdown" id="cd">—</div>
 </div></div>
 
@@ -1683,6 +1785,7 @@ function render() {
   renderPositions(acc);
   renderHistory(d.history || []);
   renderSignals();
+  renderHomeAI();
 
   allLogs = d.logs || [];
   document.getElementById('log-count').textContent = allLogs.length;
@@ -2024,6 +2127,133 @@ function _sigBadge(s, isNew) {
   return '<span class="badge b-skip">⛔ Skipped</span>';
 }
 
+/* ── Market Ticker ───────────────────────────────────── */
+async function loadTicker() {
+  try {
+    const r = await fetch('/api/market-ticker');
+    const coins = await r.json();
+    if (!coins || !coins.length) return;
+    const items = coins.map(c => {
+      const up  = c.change >= 0;
+      const cls = up ? 'up' : 'dn';
+      const arrow = up ? '▲' : '▼';
+      return `<span class="ticker-item">
+        <span class="ticker-sym">${c.symbol}</span>
+        <span class="ticker-chg ${cls}">${arrow} ${Math.abs(c.change).toFixed(2)}%</span>
+        <span class="ticker-dot"></span>
+      </span>`;
+    });
+    const half = items.join('');
+    const track = document.getElementById('ticker-track');
+    if (track) {
+      track.innerHTML = half + half;
+      track.style.animationDuration = Math.max(45, coins.length * 3.2) + 's';
+    }
+  } catch(e) { console.error('[ticker]', e); }
+}
+
+/* ── AI Analysis render ──────────────────────────────── */
+function _scoreColor(score) {
+  if (score >= 75) return 'var(--green)';
+  if (score >= 55) return 'var(--yellow)';
+  return 'var(--red)';
+}
+
+function _renderAnalysis(a) {
+  if (!a || !a.enabled) return '';
+  const score   = a.score || 50;
+  const verdict = (a.verdict || 'neutral').replace(/_/g, '-');
+  const rec     = a.recommendation || 'caution';
+  const color   = _scoreColor(score);
+  const recEmoji = {take:'✅', caution:'⚠️', skip:'❌'}[rec] || '';
+  const recLabel = {take:'Take Trade', caution:'Caution', skip:'Skip'}[rec] || rec;
+  const C = 2 * Math.PI * 18;
+  const offset = (C * (1 - score / 100)).toFixed(1);
+  const factors = (a.factors || []).map(f =>
+    `<div class="ai-factor"><div class="ai-factor-dot"></div><span>${f}</span></div>`
+  ).join('');
+  const meta = [
+    a.risk_reward && a.risk_reward !== 'N/A' && `R:R ${a.risk_reward}`,
+    a.trend_alignment && `Trend: ${a.trend_alignment}`,
+    a.leverage_risk && `Lev: ${a.leverage_risk}`,
+    a.ai ? '🤖 Claude AI' : '📐 Rule-based',
+  ].filter(Boolean).map(m => `<span class="ai-meta-chip">${m}</span>`).join('');
+  const uid = 'aip' + Math.random().toString(36).slice(2,7);
+  return `<div class="ai-panel" id="${uid}">
+    <div class="ai-panel-head" onclick="document.getElementById('${uid}').classList.toggle('open')">
+      <div class="ai-score-ring">
+        <svg width="52" height="52" viewBox="0 0 52 52">
+          <circle cx="26" cy="26" r="18" fill="none" stroke="var(--card2)" stroke-width="4"/>
+          <circle cx="26" cy="26" r="18" fill="none" stroke="${color}" stroke-width="4"
+            stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${offset}"
+            transform="rotate(-90 26 26)"/>
+        </svg>
+        <div class="ai-score-num" style="color:${color}">${score}</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-bottom:3px">
+          <span class="ai-badge s-${verdict}">${verdict.replace(/-/g,' ').toUpperCase()}</span>
+          <span class="ai-rec ${rec}">${recEmoji} ${recLabel}</span>
+        </div>
+        <div style="font-size:10.5px;color:var(--text2);line-height:1.4;overflow:hidden;
+          text-overflow:ellipsis;white-space:nowrap">${a.summary || ''}</div>
+      </div>
+      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="var(--text3)"
+        stroke-width="2.5" style="flex-shrink:0;margin-left:6px">
+        <polyline stroke-linecap="round" stroke-linejoin="round" points="6 9 12 15 18 9"/>
+      </svg>
+    </div>
+    <div class="ai-panel-body">
+      <div class="ai-meta-row">${meta}</div>
+      <div style="margin-top:10px;margin-bottom:4px;font-size:10px;font-weight:800;
+        text-transform:uppercase;letter-spacing:.8px;color:var(--text3)">Key Factors</div>
+      ${factors || '<div style="font-size:11px;color:var(--text3)">No factors available</div>'}
+    </div>
+  </div>`;
+}
+
+function renderHomeAI() {
+  const el = document.getElementById('home-ai-section');
+  if (!el) return;
+  const all      = (DATA && DATA.signals) || [];
+  const analysed = all.filter(s => s.analysis && s.analysis.enabled).slice(0, 3);
+  if (!analysed.length) {
+    el.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">
+      Signals are analysed by Claude AI as they arrive
+    </div>`;
+    return;
+  }
+  el.innerHTML = analysed.map(s => {
+    const a   = s.analysis;
+    const sig = s.signal || {};
+    const score   = a.score || 50;
+    const color   = _scoreColor(score);
+    const verdict = (a.verdict || 'neutral').replace(/_/g, '-');
+    const rec     = a.recommendation || 'caution';
+    const recEmoji = {take:'✅', caution:'⚠️', skip:'❌'}[rec] || '';
+    return `<div class="home-ai-card" onclick="goTab('signals')">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="font-size:26px;font-weight:900;color:${color};min-width:40px;text-align:center;
+          line-height:1">${score}<div style="font-size:9px;font-weight:700;color:var(--text3);
+          margin-top:1px">/100</div></div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap">
+            <span style="font-size:13px;font-weight:900">${sig.symbol || '?'}</span>
+            <span style="font-size:10px;font-weight:700;color:${sig.side==='Buy'?'var(--green)':'var(--red)'}">
+              ${sig.side==='Buy'?'LONG':'SHORT'}</span>
+            <span class="ai-badge s-${verdict}" style="font-size:9px">${verdict.replace(/-/g,' ')}</span>
+          </div>
+          <div style="font-size:10.5px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;
+            white-space:nowrap">${a.summary || ''}</div>
+        </div>
+        <span class="ai-rec ${rec}" style="flex-shrink:0;font-size:10px;padding:3px 8px">
+          ${recEmoji} ${rec}
+        </span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
 function renderSignals() {
   const all = (DATA && DATA.signals) || [];
 
@@ -2077,6 +2307,7 @@ function renderSignals() {
     const srcTag = s.source === 'recovery' ? ' · ⏪ recovered'
                   : s.source === 'live'    ? ' · 🔴 live' : '';
 
+    const aiBlock = _renderAnalysis(s.analysis);
     return `<div class="row" style="flex-direction:column;align-items:stretch;gap:5px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div class="row-left">
@@ -2084,7 +2315,7 @@ function renderSignals() {
           <div class="row-meta">${new Date(s.timestamp).toLocaleString()}${srcTag}</div>
         </div>${badge}
       </div>
-      ${contentLine}${tpsl}${errLine}${reasonLine}
+      ${contentLine}${tpsl}${errLine}${reasonLine}${aiBlock}
     </div>`;
   }).join('');
 
@@ -2451,9 +2682,11 @@ function tick() {
 fetchData();
 fetchPositions();
 loadAccounts();
+loadTicker();
 connectSSE();
 setInterval(tick, 1000);
-setInterval(fetchPositions, 15000); // refresh positions every 15s independent of main data
+setInterval(fetchPositions, 15000);
+setInterval(loadTicker, 60000);
 </script>
 </body>
 </html>"""

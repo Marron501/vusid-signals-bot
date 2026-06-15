@@ -50,3 +50,6 @@ AUTO_EXECUTE = os.getenv("AUTO_EXECUTE", "true").lower() in ("true", "1", "yes")
 # Format: http://user:pass@host:port  OR  socks5://user:pass@host:port
 # Leave blank to connect directly (recommended after moving to EU/AP Railway region).
 BYBIT_PROXY_URL = os.getenv("BYBIT_PROXY_URL", "").strip()
+
+# --- Anthropic AI (signal analysis) -----------------------------------------
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")

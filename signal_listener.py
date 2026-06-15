@@ -590,6 +590,22 @@ class DiscordSignalClient(discord.Client):
 
                     logger.info(f"Win rate {win_pct} ✅ — executing")
 
+                # ── AI signal analysis (non-blocking) ────────────────────
+                if signal["action"] == "open":
+                    try:
+                        from signal_analyzer import analyze_signal as _analyse
+                        _wr = win_rate if "win_rate" in dir() else 0.0
+                        analysis = await asyncio.get_event_loop().run_in_executor(
+                            None, _analyse, signal, _wr
+                        )
+                        log_entry["analysis"] = analysis
+                        logger.info(
+                            f"[AI] {signal.get('symbol','')} score={analysis.get('score')} "
+                            f"verdict={analysis.get('verdict')} rec={analysis.get('recommendation')}"
+                        )
+                    except Exception as _ae:
+                        logger.warning(f"[AI] analysis skipped: {_ae}")
+
                 # ── Execute ───────────────────────────────────────────────
                 exec_error = ""
                 try:
