@@ -1153,6 +1153,30 @@ select.inp option{background:var(--card);color:var(--text)}
 .ad-pos-item:last-child{margin-bottom:0}
 .ad-pos-sym{font-size:14px;font-weight:800}
 .ad-pos-pnl{font-size:13px;font-weight:800;text-align:right}
+.ad-stat-sub{font-size:9px;color:var(--text3)}
+/* account panel tabs */
+.ad-tab{flex:1;background:none;border:none;cursor:pointer;padding:7px 4px;border-radius:8px;
+  font-size:12px;font-weight:700;color:var(--text3);transition:all .15s}
+.ad-tab.active{background:var(--accent);color:#fff}
+/* full position cards in account panel */
+.adp-card{background:var(--card2);border:1px solid var(--border);border-radius:12px;
+  padding:12px;margin-bottom:10px}
+.adp-card:last-child{margin-bottom:0}
+.adp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.adp-sym{font-size:14px;font-weight:900}
+.adp-pnl{font-size:14px;font-weight:800}
+.adp-row{display:flex;gap:8px;font-size:10px;color:var(--text3);margin-bottom:8px;flex-wrap:wrap}
+.adp-row span{font-weight:700;color:var(--text)}
+.adp-sltp{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px}
+.adp-sltp input{background:var(--bg);border:1px solid var(--border);border-radius:7px;
+  padding:6px 8px;font-size:11px;color:var(--text);font-family:inherit;width:100%;box-sizing:border-box}
+.adp-sltp label{font-size:9px;font-weight:800;color:var(--text3);letter-spacing:.07em;
+  text-transform:uppercase;display:block;margin-bottom:3px}
+.adp-actions{display:flex;gap:6px}
+/* prop firm bars */
+.pf-bar-wrap{height:5px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:4px}
+.pf-bar{height:100%;border-radius:3px;transition:width .4s,background .3s}
+.mb{margin-bottom:12px}
 
 /* ── MARKET TICKER RIBBON ────────────────────────────── */
 .market-panel{display:grid;grid-template-columns:1fr 1fr;
@@ -1869,45 +1893,206 @@ select.inp option{background:var(--card);color:var(--text)}
 </div>
 
 <!-- ACCOUNT DETAIL SHEET -->
+<!-- ── Full Account Trading Panel ────────────────────── -->
 <div class="cs-overlay" id="ad-overlay" onclick="if(event.target===this)closeAccountDetail()">
-  <div class="cs-sheet" style="max-height:85vh;overflow-y:auto">
+  <div class="cs-sheet" style="max-height:92vh;overflow-y:auto;padding-bottom:20px">
     <div class="cs-handle"></div>
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
-      <div class="acct-mini-icon" id="ad-icon" style="width:40px;height:40px;border-radius:12px;background:var(--accentbg);display:flex;align-items:center;justify-content:center">
-        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="var(--accent)" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+      <div id="ad-icon" style="width:40px;height:40px;border-radius:12px;background:var(--accentbg);
+        display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="var(--accent)" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4" stroke-linecap="round" stroke-linejoin="round"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
       </div>
-      <div>
-        <div style="font-size:16px;font-weight:900" id="ad-name">—</div>
-        <div id="ad-badge-wrap" style="margin-top:3px"></div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:16px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="ad-name">—</div>
+        <div id="ad-badge-wrap" style="margin-top:3px;display:flex;align-items:center;gap:6px">
+          <span id="ad-type-badge"></span>
+          <span id="ad-prop-badge" style="display:none;font-size:9px;font-weight:800;
+            padding:2px 7px;border-radius:5px;background:rgba(251,191,36,.15);color:var(--yellow)">PROP FIRM</span>
+        </div>
+      </div>
+      <button onclick="adRefresh()" style="background:none;border:none;cursor:pointer;color:var(--text3);padding:6px">
+        <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+          <polyline stroke-linecap="round" stroke-linejoin="round" points="23 4 23 10 17 10"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Balance grid -->
+    <div class="ad-grid" style="margin-bottom:10px">
+      <div class="ad-stat">
+        <div class="ad-stat-lbl">Equity</div>
+        <div class="ad-stat-val" id="ad-equity">—</div>
+        <div class="ad-stat-sub">USDT</div>
+      </div>
+      <div class="ad-stat">
+        <div class="ad-stat-lbl">Available</div>
+        <div class="ad-stat-val" style="color:var(--cyan)" id="ad-avail">—</div>
+        <div class="ad-stat-sub">USDT</div>
+      </div>
+      <div class="ad-stat">
+        <div class="ad-stat-lbl">Margin</div>
+        <div class="ad-stat-val" style="color:var(--accent2)" id="ad-margin">—</div>
+        <div class="ad-stat-sub">USDT</div>
+      </div>
+      <div class="ad-stat">
+        <div class="ad-stat-lbl">Unreal. PnL</div>
+        <div class="ad-stat-val" id="ad-pnl">—</div>
+        <div class="ad-stat-sub">USDT</div>
       </div>
     </div>
-    <div class="ad-grid">
-      <div class="ad-stat">
-        <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Equity</div>
-        <div style="font-size:20px;font-weight:900;color:var(--text)" id="ad-equity">—</div>
-        <div style="font-size:9px;color:var(--text3)">USDT</div>
-      </div>
-      <div class="ad-stat">
-        <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Available</div>
-        <div style="font-size:20px;font-weight:900;color:var(--cyan)" id="ad-avail">—</div>
-        <div style="font-size:9px;color:var(--text3)">USDT</div>
-      </div>
-      <div class="ad-stat">
-        <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Margin Used</div>
-        <div style="font-size:20px;font-weight:900;color:var(--accent2)" id="ad-margin">—</div>
-        <div style="font-size:9px;color:var(--text3)">USDT</div>
-      </div>
-      <div class="ad-stat">
-        <div style="font-size:10px;color:var(--text3);margin-bottom:3px;font-weight:700;text-transform:uppercase;letter-spacing:.5px">Unreal. PnL</div>
-        <div style="font-size:20px;font-weight:900" id="ad-pnl">—</div>
-        <div style="font-size:9px;color:var(--text3)">USDT</div>
+
+    <!-- Prop firm risk meters -->
+    <div id="ad-prop-meters" style="display:none;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--yellow);
+        text-transform:uppercase;margin-bottom:6px">Prop Firm Risk</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:700">Daily Loss</div>
+          <div style="height:5px;background:var(--border);border-radius:3px;margin-bottom:4px;overflow:hidden">
+            <div id="ad-dl-bar" style="height:100%;border-radius:3px;background:var(--green);transition:width .4s;width:0%"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px">
+            <span id="ad-dl-val" style="font-weight:800">0.00%</span>
+            <span style="color:var(--text3)">limit: <span id="ad-dl-limit">5%</span></span>
+          </div>
+        </div>
+        <div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px">
+          <div style="font-size:10px;color:var(--text3);margin-bottom:4px;font-weight:700">Max Drawdown</div>
+          <div style="height:5px;background:var(--border);border-radius:3px;margin-bottom:4px;overflow:hidden">
+            <div id="ad-dd-bar" style="height:100%;border-radius:3px;background:var(--green);transition:width .4s;width:0%"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px">
+            <span id="ad-dd-val" style="font-weight:800">0.00%</span>
+            <span style="color:var(--text3)">limit: <span id="ad-dd-limit">10%</span></span>
+          </div>
+        </div>
       </div>
     </div>
-    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin:12px 0 8px">Open Positions</div>
-    <div id="ad-positions">
-      <div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">Loading…</div>
+
+    <!-- Tab bar -->
+    <div style="display:flex;gap:0;background:var(--card2);border:1px solid var(--border);
+      border-radius:10px;padding:3px;margin-bottom:12px" id="ad-tab-bar">
+      <button class="ad-tab active" onclick="adTab('positions',this)">Positions</button>
+      <button class="ad-tab" onclick="adTab('trade',this)">Trade</button>
+      <button class="ad-tab" onclick="adTab('risk',this)">Risk</button>
     </div>
-    <button class="btn btn-ghost btn-sm" onclick="closeAccountDetail()" style="margin-top:14px">Done</button>
+
+    <!-- TAB: Positions -->
+    <div id="ad-tab-positions">
+      <div id="ad-positions">
+        <div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">Loading…</div>
+      </div>
+      <button class="btn btn-red btn-sm" style="width:100%;margin-top:10px" onclick="adCloseAll()">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:13px;height:13px;stroke-width:2.5">
+          <circle cx="12" cy="12" r="10" stroke-linecap="round"/><line x1="15" y1="9" x2="9" y2="15" stroke-linecap="round"/><line x1="9" y1="9" x2="15" y2="15" stroke-linecap="round"/>
+        </svg>
+        Close All Positions
+      </button>
+    </div>
+
+    <!-- TAB: Trade -->
+    <div id="ad-tab-trade" style="display:none">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
+        color:var(--text3);margin-bottom:10px">Manual Trade</div>
+      <div class="inp-grid mb">
+        <div class="inp-wrap">
+          <label class="inp-lbl">Symbol</label>
+          <input class="inp" type="text" id="ad-sym" placeholder="BTC" autocapitalize="characters" autocomplete="off">
+        </div>
+        <div class="inp-wrap">
+          <label class="inp-lbl">Direction</label>
+          <select class="inp" id="ad-side">
+            <option value="Buy">Long ↑</option>
+            <option value="Sell">Short ↓</option>
+          </select>
+        </div>
+      </div>
+      <div class="inp-grid mb">
+        <div class="inp-wrap">
+          <label class="inp-lbl">Size % of equity</label>
+          <input class="inp" type="number" id="ad-size-pct" min="1" max="100" placeholder="10" value="10">
+        </div>
+        <div class="inp-wrap">
+          <label class="inp-lbl">Leverage ×</label>
+          <input class="inp" type="number" id="ad-lev" min="1" max="100" placeholder="5" value="5">
+        </div>
+      </div>
+      <div class="inp-grid mb">
+        <div class="inp-wrap">
+          <label class="inp-lbl">Stop Loss (optional)</label>
+          <input class="inp" type="number" id="ad-sl" placeholder="0.0000" step="any">
+        </div>
+        <div class="inp-wrap">
+          <label class="inp-lbl">Take Profit (optional)</label>
+          <input class="inp" type="number" id="ad-tp" placeholder="0.0000" step="any">
+        </div>
+      </div>
+      <div id="ad-trade-preview" style="background:var(--card2);border:1px solid var(--border);
+        border-radius:10px;padding:10px;margin-bottom:12px;font-size:11px;display:none">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="color:var(--text3)">Est. margin</span><span id="ad-prev-margin" style="font-weight:800">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="color:var(--text3)">Position notional</span><span id="ad-prev-notional" style="font-weight:800">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--text3)">Max loss (SL hit)</span><span id="ad-prev-loss" style="font-weight:800;color:var(--red)">—</span>
+        </div>
+      </div>
+      <div class="btn-grid">
+        <button class="btn btn-green" onclick="adOpenTrade()">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:14px;height:14px;stroke-width:2.5">
+            <polyline stroke-linecap="round" stroke-linejoin="round" points="23 6 13.5 15.5 8.5 10.5 1 18"/>
+            <polyline stroke-linecap="round" stroke-linejoin="round" points="17 6 23 6 23 12"/>
+          </svg>
+          Open Trade
+        </button>
+        <button class="btn btn-ghost" onclick="adClearTradeForm()">Clear</button>
+      </div>
+      <div id="ad-trade-msg" style="margin-top:10px;font-size:11px;text-align:center;display:none"></div>
+    </div>
+
+    <!-- TAB: Risk -->
+    <div id="ad-tab-risk" style="display:none">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
+        color:var(--text3);margin-bottom:10px">Prop Firm Settings</div>
+      <div class="toggle-row" style="margin-bottom:12px">
+        <div class="toggle-info"><strong>Prop Firm Mode</strong><span>Enables daily loss & drawdown meters</span></div>
+        <label class="switch"><input type="checkbox" id="ad-prop-toggle" onchange="adTogglePropMode(this)"><span class="sw-track"></span></label>
+      </div>
+      <div class="inp-grid mb">
+        <div class="inp-wrap">
+          <label class="inp-lbl">Daily Loss Limit %</label>
+          <input class="inp" type="number" id="ad-dl-inp" min="1" max="20" step="0.5" placeholder="5" value="5">
+        </div>
+        <div class="inp-wrap">
+          <label class="inp-lbl">Max Drawdown Limit %</label>
+          <input class="inp" type="number" id="ad-dd-inp" min="1" max="30" step="0.5" placeholder="10" value="10">
+        </div>
+      </div>
+      <div class="inp-wrap mb">
+        <label class="inp-lbl">Account Size (starting capital $)</label>
+        <input class="inp" type="number" id="ad-cap-inp" min="100" placeholder="10000">
+      </div>
+      <button class="btn btn-primary" onclick="adSavePropSettings()">Save Settings</button>
+      <div style="background:var(--card2);border:1px solid var(--border);border-radius:10px;
+        padding:12px;margin-top:14px;font-size:11px;color:var(--text3);line-height:1.7">
+        <strong style="color:var(--yellow)">Prop firm rules enforced here:</strong><br>
+        • Daily loss meter tracks unrealised PnL vs starting day balance<br>
+        • Drawdown meter tracks equity drop from account starting capital<br>
+        • Visual warning at 80% of each limit — red at 100%<br>
+        • Auto Execute is automatically disabled if either limit is breached
+      </div>
+    </div>
+
+    <button class="btn btn-ghost btn-sm" onclick="closeAccountDetail()" style="margin-top:14px;width:100%">Done</button>
   </div>
 </div>
 
@@ -2994,9 +3179,27 @@ function renderHomeAccounts() {
   el.innerHTML = cards.length ? cards.join('') : '<div class="acct-mini" style="opacity:.5;cursor:default"><div class="acct-mini-body"><div class="acct-mini-name" style="color:var(--text3)">No accounts configured</div></div></div>';
 }
 
+/* ── Account Detail Panel state ───────────────────── */
+let _adAccountId   = null;
+let _adBalCache    = {};
+let _adPropCfg     = {};   // keyed by account id: {prop: bool, dailyLimit, ddLimit, capital}
+
 async function openAccountDetail(id) {
+  _adAccountId = id;
   const ov = document.getElementById('ad-overlay');
   ov.classList.add('open');
+
+  // Reset to Positions tab
+  adTab('positions', document.querySelector('#ad-tab-bar .ad-tab'));
+
+  // Load saved prop cfg for this account
+  const cfg = _adPropCfg[id] || {prop: false, dailyLimit: 5, ddLimit: 10, capital: 0};
+  document.getElementById('ad-prop-toggle').checked = cfg.prop;
+  document.getElementById('ad-dl-inp').value   = cfg.dailyLimit;
+  document.getElementById('ad-dd-inp').value   = cfg.ddLimit;
+  document.getElementById('ad-cap-inp').value  = cfg.capital || '';
+  document.getElementById('ad-prop-meters').style.display = cfg.prop ? 'block' : 'none';
+  document.getElementById('ad-prop-badge').style.display  = cfg.prop ? 'inline-block' : 'none';
 
   let name, isDemo, balData;
   if (id === 'primary') {
@@ -3016,70 +3219,256 @@ async function openAccountDetail(id) {
   }
 
   document.getElementById('ad-name').textContent = name;
-  const badgeWrap = document.getElementById('ad-badge-wrap');
-  badgeWrap.innerHTML = isDemo ? '<span class="badge-demo">DEMO</span>' : '<span class="badge-live">LIVE</span>';
+  const typeEl = document.getElementById('ad-type-badge');
+  typeEl.innerHTML = isDemo
+    ? '<span class="badge-demo">DEMO</span>'
+    : '<span class="badge-live">LIVE</span>';
 
-  // Render positions for this account
-  const adPos = document.getElementById('ad-positions');
-  const myPos = _allPositions.filter(p => id === 'primary' ? p.account_id === 'primary' : p.account_id === id);
-  if (myPos.length) {
-    adPos.innerHTML = myPos.map(p => {
-      const pnl = p.unrealised_pnl || 0;
-      const pnlCls = pnl >= 0 ? 'pos' : 'neg';
-      return `<div class="ad-pos-item">
-        <div style="display:flex;align-items:center;gap:8px">
-          <span style="font-size:13px;font-weight:900">${p.symbol.replace('USDT','')}</span>
-          <span class="tag ${p.side==='Buy'?'green':'red'}" style="font-size:9px">${p.side==='Buy'?'LONG':'SHORT'}</span>
-          <span class="tag blue" style="font-size:9px">${p.leverage}×</span>
-          <span style="flex:1"></span>
-          <span class="${pnlCls}" style="font-size:12px;font-weight:800">${(pnl>=0?'+':'')+pnl.toFixed(2)}</span>
-        </div>
-        <div style="display:flex;gap:12px;margin-top:5px;font-size:10px;color:var(--text3)">
-          <span>Entry: ${parseFloat(p.entry_price).toFixed(4)}</span>
-          <span>Size: ${p.size}</span>
-        </div>
-        <button class="btn btn-red btn-sm" style="margin-top:8px;font-size:11px" onclick="closeAccountDetail();setTimeout(()=>closePosition(${_allPositions.indexOf(p)}),200)">
-          ✕ Close
-        </button>
-      </div>`;
-    }).join('');
-  } else {
-    adPos.innerHTML = '<div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">No open positions</div>';
-  }
+  _renderAdPositions(id);
 
-  // Load balance if not cached or is primary (already have it)
   if (balData) {
-    _renderAdBal(balData);
+    _renderAdBal(balData, id);
   } else {
-    document.getElementById('ad-equity').textContent = '…';
-    document.getElementById('ad-avail').textContent  = '…';
-    document.getElementById('ad-margin').textContent = '…';
-    document.getElementById('ad-pnl').textContent    = '…';
+    ['ad-equity','ad-avail','ad-margin'].forEach(i => document.getElementById(i).textContent = '…');
+    document.getElementById('ad-pnl').textContent = '…';
     try {
       const r = await fetch('/api/accounts/' + id + '/balance');
       const b = await r.json();
       _homeAccBalCache[id] = b;
-      _renderAdBal(b);
+      _adBalCache[id] = b;
+      _renderAdBal(b, id);
     } catch(e) {
       document.getElementById('ad-equity').textContent = 'Error';
     }
   }
 }
 
-function _renderAdBal(b) {
-  document.getElementById('ad-equity').textContent = (b.equity||0).toFixed(2);
+async function adRefresh() {
+  if (!_adAccountId) return;
+  ['ad-equity','ad-avail','ad-margin'].forEach(i => document.getElementById(i).textContent = '…');
+  try {
+    const r = await fetch('/api/accounts/' + _adAccountId + '/balance');
+    const b = await r.json();
+    _homeAccBalCache[_adAccountId] = b;
+    _adBalCache[_adAccountId] = b;
+    _renderAdBal(b, _adAccountId);
+  } catch(e) { toast('Refresh failed','err'); }
+  _renderAdPositions(_adAccountId);
+}
+
+function _renderAdBal(b, id) {
+  const equity = b.equity || 0;
+  document.getElementById('ad-equity').textContent = equity.toFixed(2);
   document.getElementById('ad-avail').textContent  = (b.available||0).toFixed(2);
   document.getElementById('ad-margin').textContent = (b.used_margin||0).toFixed(2);
   const pnl = b.unrealised_pnl || 0;
   const pnlEl = document.getElementById('ad-pnl');
-  pnlEl.textContent = (pnl>=0?'+':'')+pnl.toFixed(2);
-  pnlEl.className   = pnl >= 0 ? 'pos' : 'neg';
-  pnlEl.style.fontSize = '20px';
-  pnlEl.style.fontWeight = '900';
+  pnlEl.textContent    = (pnl>=0?'+':'')+pnl.toFixed(2);
+  pnlEl.className      = 'ad-stat-val ' + (pnl >= 0 ? 'pos' : 'neg');
+
+  // Update prop firm meters if enabled
+  const cfg = _adPropCfg[id];
+  if (cfg && cfg.prop && cfg.capital > 0) {
+    const dailyPct  = Math.abs(pnl) / cfg.capital * 100;
+    const ddPct     = Math.max(0, (cfg.capital - equity) / cfg.capital * 100);
+    _updatePropBar('dl', dailyPct, cfg.dailyLimit);
+    _updatePropBar('dd', ddPct,    cfg.ddLimit);
+  }
+}
+
+function _updatePropBar(key, val, limit) {
+  const pct    = Math.min(val / limit * 100, 100);
+  const color  = pct >= 100 ? 'var(--red)' : pct >= 80 ? 'var(--yellow)' : 'var(--green)';
+  const bar    = document.getElementById('ad-' + key + '-bar');
+  const valEl  = document.getElementById('ad-' + key + '-val');
+  const limEl  = document.getElementById('ad-' + key + '-limit');
+  if (bar)   { bar.style.width = pct + '%'; bar.style.background = color; }
+  if (valEl)   valEl.textContent = val.toFixed(2) + '%';
+  if (limEl)   limEl.textContent = limit + '%';
+}
+
+function _renderAdPositions(id) {
+  const adPos = document.getElementById('ad-positions');
+  const myPos = _allPositions.filter(p =>
+    id === 'primary' ? (p.account_id === 'primary' || !p.account_id) : p.account_id === id
+  );
+  if (!myPos.length) {
+    adPos.innerHTML = '<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">No open positions</div>';
+    return;
+  }
+  adPos.innerHTML = myPos.map((p, i) => {
+    const pnl    = p.unrealised_pnl || 0;
+    const pnlCls = pnl >= 0 ? 'pos' : 'neg';
+    const sl     = p.stop_loss   || p.stopLoss   || '';
+    const tp     = p.take_profit || p.takeProfit || '';
+    const uid    = 'adp_' + i;
+    return `<div class="adp-card">
+      <div class="adp-head">
+        <div style="display:flex;align-items:center;gap:7px">
+          <span class="adp-sym">${p.symbol.replace('USDT','')}</span>
+          <span class="tag ${p.side==='Buy'?'green':'red'}" style="font-size:9px">${p.side==='Buy'?'LONG':'SHORT'}</span>
+          <span class="tag blue" style="font-size:9px">${p.leverage}×</span>
+        </div>
+        <span class="adp-pnl ${pnlCls}">${(pnl>=0?'+':'')}${pnl.toFixed(2)}</span>
+      </div>
+      <div class="adp-row">
+        <span style="color:var(--text3)">Entry</span><span>${parseFloat(p.entry_price||0).toFixed(4)}</span>
+        <span style="color:var(--text3)">Size</span><span>${p.size}</span>
+        <span style="color:var(--text3)">Notional</span><span>$${((p.size||0)*(p.mark_price||p.entry_price||0)).toFixed(2)}</span>
+      </div>
+      <div class="adp-sltp">
+        <div>
+          <label>Stop Loss</label>
+          <input id="${uid}-sl" type="number" step="any" value="${sl}" placeholder="—">
+        </div>
+        <div>
+          <label>Take Profit</label>
+          <input id="${uid}-tp" type="number" step="any" value="${tp}" placeholder="—">
+        </div>
+      </div>
+      <div class="adp-actions">
+        <button class="btn btn-primary btn-sm" style="flex:1;font-size:11px"
+          onclick="adSetSlTp('${p.symbol}','${p.side}','${uid}')">Update SL/TP</button>
+        <button class="btn btn-red btn-sm" style="flex:1;font-size:11px"
+          onclick="adClose('${p.symbol}','${p.side}')">Close</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function adTab(name, el) {
+  document.querySelectorAll('.ad-tab').forEach(b => b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  ['positions','trade','risk'].forEach(t => {
+    document.getElementById('ad-tab-' + t).style.display = t === name ? 'block' : 'none';
+  });
+}
+
+async function adSetSlTp(symbol, side, uid) {
+  const sl = document.getElementById(uid + '-sl').value;
+  const tp = document.getElementById(uid + '-tp').value;
+  if (!sl && !tp) { toast('Enter SL or TP','err'); return; }
+  const body = {symbol, side, account_id: _adAccountId};
+  if (sl) body.stop_loss   = parseFloat(sl);
+  if (tp) body.take_profit = parseFloat(tp);
+  try {
+    const r = await fetch('/api/set-sl-tp', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const d = await r.json();
+    toast(d.success ? 'SL/TP updated' : (d.error || 'Failed'), d.success);
+    if (d.success) adRefresh();
+  } catch(e) { toast('Request failed','err'); }
+}
+
+async function adClose(symbol, side) {
+  if (!confirm(`Close ${symbol} ${side} on this account?`)) return;
+  try {
+    const r = await fetch('/api/close', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({symbol, side, account_id: _adAccountId})
+    });
+    const d = await r.json();
+    toast(d.success ? `${symbol} closed` : (d.error || 'Failed'), d.success);
+    if (d.success) { await fetchPositions(); _renderAdPositions(_adAccountId); }
+  } catch(e) { toast('Request failed','err'); }
+}
+
+async function adCloseAll() {
+  if (!confirm('Close ALL positions on this account?')) return;
+  try {
+    const r = await fetch('/api/close-all', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({account_id: _adAccountId})
+    });
+    const d = await r.json();
+    toast(d.message || (d.success ? 'All closed' : 'Failed'), d.success !== false);
+    if (d.success !== false) { await fetchPositions(); _renderAdPositions(_adAccountId); }
+  } catch(e) { toast('Request failed','err'); }
+}
+
+async function adOpenTrade() {
+  const sym     = (document.getElementById('ad-sym').value || '').trim().toUpperCase();
+  const side    = document.getElementById('ad-side').value;
+  const sizePct = parseFloat(document.getElementById('ad-size-pct').value) || 10;
+  const lev     = parseInt(document.getElementById('ad-lev').value) || 5;
+  const sl      = document.getElementById('ad-sl').value;
+  const tp      = document.getElementById('ad-tp').value;
+  if (!sym) { toast('Enter a symbol','err'); return; }
+  const body = {
+    symbol: sym.endsWith('USDT') ? sym : sym + 'USDT',
+    side, leverage: lev, equity_pct: sizePct, account_id: _adAccountId
+  };
+  if (sl) body.stop_loss   = parseFloat(sl);
+  if (tp) body.take_profit = parseFloat(tp);
+  const msgEl = document.getElementById('ad-trade-msg');
+  msgEl.style.display = 'block';
+  msgEl.style.color = 'var(--text3)';
+  msgEl.textContent = 'Sending order…';
+  try {
+    const r = await fetch('/api/trade', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (d.success) {
+      msgEl.style.color = 'var(--green)';
+      msgEl.textContent = `${body.symbol} ${side} opened`;
+      toast(`${body.symbol} opened`, true);
+      adClearTradeForm();
+      setTimeout(() => { fetchPositions(); _renderAdPositions(_adAccountId); }, 1500);
+    } else {
+      msgEl.style.color = 'var(--red)';
+      msgEl.textContent = d.error || 'Order failed';
+    }
+  } catch(e) {
+    msgEl.style.color = 'var(--red)';
+    msgEl.textContent = 'Request failed';
+  }
+}
+
+function adClearTradeForm() {
+  ['ad-sym','ad-sl','ad-tp'].forEach(i => document.getElementById(i).value = '');
+  document.getElementById('ad-size-pct').value = '10';
+  document.getElementById('ad-lev').value      = '5';
+  document.getElementById('ad-trade-msg').style.display = 'none';
+  document.getElementById('ad-trade-preview').style.display = 'none';
+}
+
+function adTogglePropMode(el) {
+  const id  = _adAccountId;
+  const cfg = _adPropCfg[id] || {dailyLimit:5, ddLimit:10, capital:0};
+  cfg.prop  = el.checked;
+  _adPropCfg[id] = cfg;
+  document.getElementById('ad-prop-meters').style.display = el.checked ? 'block' : 'none';
+  document.getElementById('ad-prop-badge').style.display  = el.checked ? 'inline-block' : 'none';
+  try { localStorage.setItem('adPropCfg', JSON.stringify(_adPropCfg)); } catch(_) {}
+}
+
+function adSavePropSettings() {
+  const id = _adAccountId;
+  _adPropCfg[id] = {
+    prop:       document.getElementById('ad-prop-toggle').checked,
+    dailyLimit: parseFloat(document.getElementById('ad-dl-inp').value) || 5,
+    ddLimit:    parseFloat(document.getElementById('ad-dd-inp').value) || 10,
+    capital:    parseFloat(document.getElementById('ad-cap-inp').value) || 0,
+  };
+  try { localStorage.setItem('adPropCfg', JSON.stringify(_adPropCfg)); } catch(_) {}
+  toast('Prop settings saved', true);
+  document.getElementById('ad-dl-limit').textContent = _adPropCfg[id].dailyLimit + '%';
+  document.getElementById('ad-dd-limit').textContent = _adPropCfg[id].ddLimit + '%';
+  // Rerender meters with latest balance
+  const b = _adBalCache[id] || _homeAccBalCache[id];
+  if (b) _renderAdBal(b, id);
+}
+
+function _adRestorePropCfg() {
+  try {
+    const s = localStorage.getItem('adPropCfg');
+    if (s) _adPropCfg = JSON.parse(s);
+  } catch(_) {}
 }
 
 function closeAccountDetail() {
   document.getElementById('ad-overlay').classList.remove('open');
+  _adAccountId = null;
 }
 
 function openAddAccount() {
@@ -3205,6 +3594,7 @@ function tick() {
 
 /* ── Boot ────────────────────────────────────────────── */
 _restorePanels();
+_adRestorePropCfg();
 fetchData();
 fetchPositions();
 loadAccounts();
