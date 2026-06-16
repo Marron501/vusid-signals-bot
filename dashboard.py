@@ -2564,6 +2564,13 @@ function _scoreColor(score) {
   return 'var(--red)';
 }
 
+function _toggleAiPanel(uid) {
+  const panel = document.getElementById(uid);
+  const lbl   = document.getElementById(uid + '-lbl');
+  const open  = panel.classList.toggle('open');
+  if (lbl) lbl.textContent = open ? 'Hide ▴' : 'View ▾';
+}
+
 function _renderAnalysis(a) {
   if (!a || !a.enabled) return '';
   const score   = a.score || 50;
@@ -2585,7 +2592,7 @@ function _renderAnalysis(a) {
   ].filter(Boolean).map(m => `<span class="ai-meta-chip">${m}</span>`).join('');
   const uid = 'aip' + Math.random().toString(36).slice(2,7);
   return `<div class="ai-panel" id="${uid}">
-    <div class="ai-panel-head" onclick="document.getElementById('${uid}').classList.toggle('open')">
+    <div class="ai-panel-head" onclick="_toggleAiPanel('${uid}')">
       <div class="ai-score-ring">
         <svg width="52" height="52" viewBox="0 0 52 52">
           <circle cx="26" cy="26" r="18" fill="none" stroke="var(--card2)" stroke-width="4"/>
@@ -2603,10 +2610,8 @@ function _renderAnalysis(a) {
         <div style="font-size:10.5px;color:var(--text2);line-height:1.4;overflow:hidden;
           text-overflow:ellipsis;white-space:nowrap">${a.summary || ''}</div>
       </div>
-      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="var(--text3)"
-        stroke-width="2.5" style="flex-shrink:0;margin-left:6px">
-        <polyline stroke-linecap="round" stroke-linejoin="round" points="6 9 12 15 18 9"/>
-      </svg>
+      <span id="${uid}-lbl" style="flex-shrink:0;margin-left:8px;font-size:10px;font-weight:700;
+        color:var(--accent2);white-space:nowrap">View ▾</span>
     </div>
     <div class="ai-panel-body">
       <div class="ai-meta-row">${meta}</div>
