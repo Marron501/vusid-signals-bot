@@ -873,10 +873,10 @@ button,input,select{font-family:inherit}
 .bal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:16px}
 .bal-box{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.2);
   border-radius:12px;padding:12px;backdrop-filter:blur(8px)}
-.bal-lbl{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.7);margin-bottom:4px}
-.bal-val{font-size:19px;font-weight:800;color:#FFFFFF}
-.bal-val.cyan{color:#BAE6FD}.bal-val.blue{color:#BFDBFE}
+.bal-lbl{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,.75);margin-bottom:4px}
+.bal-val{font-size:20px;font-weight:900;color:#FFFFFF}
 .bal-val.pos{color:#BBF7D0}.bal-val.neg{color:#FCA5A5}
+.bal-sub{font-size:9px;color:rgba(255,255,255,.6);margin-top:2px;font-weight:600}
 
 /* ── STATS ───────────────────────────────────────────── */
 .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
@@ -1243,6 +1243,39 @@ select.inp option{background:var(--card);color:var(--text)}
 .ai-meta-chip{background:var(--card2);border:1px solid var(--border);border-radius:6px;
   padding:3px 8px;font-size:10px;font-weight:600;color:var(--text3)}
 .ai-summary{font-size:11.5px;color:var(--text2);margin:10px 0 6px;line-height:1.5}
+/* ── Signal Analysis Full-Screen Overlay ── */
+.sa-overlay{position:fixed;inset:0;z-index:500;background:var(--modal-bg);
+  backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  display:none;align-items:flex-end;justify-content:center}
+.sa-overlay.open{display:flex}
+.sa-sheet{background:var(--surface);border:1px solid var(--border);
+  border-radius:28px 28px 0 0;width:100%;max-height:92dvh;overflow-y:auto;
+  padding:20px;padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));
+  animation:slideup .28s cubic-bezier(.4,0,.2,1);
+  box-shadow:0 -8px 48px rgba(37,99,235,.15)}
+.sa-hero{display:flex;align-items:center;gap:16px;margin-bottom:18px;padding-bottom:16px;
+  border-bottom:1px solid var(--border)}
+.sa-score-ring{position:relative;width:72px;height:72px;flex-shrink:0}
+.sa-score-ring svg{transform:rotate(-90deg)}
+.sa-score-num{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;font-size:18px;font-weight:900}
+.sa-symbol{font-size:24px;font-weight:900;letter-spacing:-.5px}
+.sa-section-lbl{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:1px;
+  color:var(--text3);margin:14px 0 8px}
+.sa-factor{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;
+  background:var(--card2);border:1px solid var(--border);border-radius:10px;margin-bottom:6px}
+.sa-factor:last-child{margin-bottom:0}
+.sa-factor-icon{width:22px;height:22px;border-radius:6px;background:var(--accentbg);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.sa-factor-icon svg{width:12px;height:12px;stroke:var(--accent);stroke-width:2.5}
+.sa-factor-txt{font-size:12px;color:var(--text2);line-height:1.5;flex:1}
+.sa-summary-box{background:var(--card2);border:1px solid var(--border);border-radius:12px;
+  padding:14px;font-size:12.5px;color:var(--text2);line-height:1.6;margin-bottom:10px}
+.sa-meta-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px}
+.sa-meta-box{background:var(--card2);border:1px solid var(--border);border-radius:10px;padding:10px}
+.sa-meta-lbl{font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
+  color:var(--text3);margin-bottom:3px}
+.sa-meta-val{font-size:14px;font-weight:800}
 .home-ai-section{margin-top:4px}
 .home-ai-card{background:var(--card);border:1px solid var(--border);border-radius:14px;
   padding:13px 14px;margin-bottom:8px;cursor:pointer;transition:all .15s}
@@ -1387,10 +1420,26 @@ select.inp option{background:var(--card);color:var(--text)}
     <div class="hero-amt" id="b-equity">— USDT</div>
     <div class="hero-sub">Bybit Unified · <span id="b-ts">—</span></div>
     <div class="bal-grid">
-      <div class="bal-box"><div class="bal-lbl">Available</div><div class="bal-val cyan" id="b-avail">—</div><div style="font-size:9px;color:var(--text3);margin-top:2px">USDT</div></div>
-      <div class="bal-box"><div class="bal-lbl">Used Margin</div><div class="bal-val" style="color:var(--accent2)" id="b-margin">—</div><div style="font-size:9px;color:var(--text3);margin-top:2px">USDT</div></div>
-      <div class="bal-box"><div class="bal-lbl">Unrealised PnL</div><div class="bal-val" id="b-upnl">—</div><div style="font-size:9px;color:var(--text3);margin-top:2px">USDT</div></div>
-      <div class="bal-box"><div class="bal-lbl">Per Trade</div><div class="bal-val" style="color:var(--accent2)" id="b-pertrade">—</div><div style="font-size:9px;color:var(--text3);margin-top:2px">@ <span id="b-lev">—</span>×</div></div>
+      <div class="bal-box">
+        <div class="bal-lbl">Available</div>
+        <div class="bal-val" style="color:#BAE6FD" id="b-avail">—</div>
+        <div class="bal-sub">USDT</div>
+      </div>
+      <div class="bal-box">
+        <div class="bal-lbl">Used Margin</div>
+        <div class="bal-val" style="color:#FDE68A" id="b-margin">—</div>
+        <div class="bal-sub">USDT</div>
+      </div>
+      <div class="bal-box">
+        <div class="bal-lbl">Unrealised PnL</div>
+        <div class="bal-val" id="b-upnl">—</div>
+        <div class="bal-sub">USDT</div>
+      </div>
+      <div class="bal-box">
+        <div class="bal-lbl">Per Trade</div>
+        <div class="bal-val" style="color:#A5F3FC" id="b-pertrade">—</div>
+        <div class="bal-sub">@ <span id="b-lev">—</span>×</div>
+      </div>
     </div>
   </div>
 
@@ -2758,14 +2807,10 @@ function _scoreColor(score) {
   return 'var(--red)';
 }
 
-function _toggleAiPanel(uid) {
-  const panel = document.getElementById(uid);
-  const lbl   = document.getElementById(uid + '-lbl');
-  const open  = panel.classList.toggle('open');
-  if (lbl) lbl.textContent = open ? 'Hide ▴' : 'View ▾';
-}
+/* ── Analysis store (uid → analysis data + signal context) ── */
+const _sigAnalysisStore = {};
 
-function _renderAnalysis(a) {
+function _renderAnalysis(a, sigContext) {
   if (!a || !a.enabled) return '';
   const score   = a.score || 50;
   const verdict = (a.verdict || 'neutral').replace(/_/g, '-');
@@ -2775,18 +2820,10 @@ function _renderAnalysis(a) {
   const recLabel = {take:'Take Trade', caution:'Caution', skip:'Skip'}[rec] || rec;
   const C = 2 * Math.PI * 18;
   const offset = (C * (1 - score / 100)).toFixed(1);
-  const factors = (a.factors || []).map(f =>
-    `<div class="ai-factor"><div class="ai-factor-dot"></div><span>${f}</span></div>`
-  ).join('');
-  const meta = [
-    a.risk_reward && a.risk_reward !== 'N/A' && `R:R ${a.risk_reward}`,
-    a.trend_alignment && `Trend: ${a.trend_alignment}`,
-    a.leverage_risk && `Lev: ${a.leverage_risk}`,
-    a.ai ? '🤖 Claude AI' : '📐 Rule-based',
-  ].filter(Boolean).map(m => `<span class="ai-meta-chip">${m}</span>`).join('');
   const uid = 'aip' + Math.random().toString(36).slice(2,7);
+  _sigAnalysisStore[uid] = {analysis: a, signal: sigContext || {}};
   return `<div class="ai-panel" id="${uid}">
-    <div class="ai-panel-head" onclick="_toggleAiPanel('${uid}')">
+    <div class="ai-panel-head" onclick="openSigAnalysis('${uid}')" style="cursor:pointer">
       <div class="ai-score-ring">
         <svg width="52" height="52" viewBox="0 0 52 52">
           <circle cx="26" cy="26" r="18" fill="none" stroke="var(--card2)" stroke-width="4"/>
@@ -2802,18 +2839,83 @@ function _renderAnalysis(a) {
           <span class="ai-rec ${rec}">${recEmoji} ${recLabel}</span>
         </div>
         <div style="font-size:10.5px;color:var(--text2);line-height:1.4;overflow:hidden;
-          text-overflow:ellipsis;white-space:nowrap">${a.summary || ''}</div>
+          text-overflow:ellipsis;white-space:nowrap">${a.summary || 'Tap to view full analysis'}</div>
       </div>
-      <span id="${uid}-lbl" style="flex-shrink:0;margin-left:8px;font-size:10px;font-weight:700;
-        color:var(--accent2);white-space:nowrap">View ▾</span>
-    </div>
-    <div class="ai-panel-body">
-      <div class="ai-meta-row">${meta}</div>
-      <div style="margin-top:10px;margin-bottom:4px;font-size:10px;font-weight:800;
-        text-transform:uppercase;letter-spacing:.8px;color:var(--text3)">Key Factors</div>
-      ${factors || '<div style="font-size:11px;color:var(--text3)">No factors available</div>'}
+      <span style="flex-shrink:0;margin-left:8px;font-size:10px;font-weight:700;
+        color:var(--accent);white-space:nowrap">View ▸</span>
     </div>
   </div>`;
+}
+
+function openSigAnalysis(uid) {
+  const entry = _sigAnalysisStore[uid];
+  if (!entry) return;
+  const {analysis: a, signal: s} = entry;
+
+  const score   = a.score || 50;
+  const verdict = (a.verdict || 'neutral').replace(/_/g, '-');
+  const rec     = a.recommendation || 'caution';
+  const color   = _scoreColor(score);
+  const recEmoji = {take:'✅', caution:'⚠️', skip:'❌'}[rec] || '';
+  const recLabel = {take:'Take Trade', caution:'Caution', skip:'Skip'}[rec] || rec;
+
+  // Score arc
+  const C = 2 * Math.PI * 28;
+  const offset = (C * (1 - score / 100)).toFixed(1);
+  const arc = document.getElementById('sa-score-arc');
+  arc.setAttribute('stroke-dasharray', C.toFixed(1));
+  arc.setAttribute('stroke-dashoffset', offset);
+  arc.setAttribute('stroke', color);
+  document.getElementById('sa-score-num').textContent = score;
+  document.getElementById('sa-score-num').style.color = color;
+
+  // Symbol + side
+  const sym  = s.symbol || a.symbol || '—';
+  const side = s.side || s.action || '';
+  document.getElementById('sa-symbol').textContent = sym;
+  const sideTag = document.getElementById('sa-side-tag');
+  sideTag.className = 'tag ' + (side === 'Buy' ? 'long' : side === 'Sell' ? 'short' : '');
+  sideTag.textContent = side === 'Buy' ? 'LONG' : side === 'Sell' ? 'SHORT' : side || '';
+
+  // Verdict + rec
+  const vEl = document.getElementById('sa-verdict-badge');
+  vEl.className = `ai-badge s-${verdict}`;
+  vEl.textContent = verdict.replace(/-/g,' ').toUpperCase();
+  const rEl = document.getElementById('sa-rec-badge');
+  rEl.className = `ai-rec ${rec}`;
+  rEl.textContent = recEmoji + ' ' + recLabel;
+
+  // Meta grid
+  document.getElementById('sa-rr').textContent       = a.risk_reward || 'N/A';
+  document.getElementById('sa-trend').textContent    = a.trend_alignment || '—';
+  document.getElementById('sa-lev-risk').textContent = a.leverage_risk || '—';
+  document.getElementById('sa-conf').textContent     = a.confidence || '—';
+
+  // Summary
+  document.getElementById('sa-summary').textContent = a.summary || 'No summary available.';
+
+  // Factors
+  const factors = (a.factors || []);
+  document.getElementById('sa-factors').innerHTML = factors.length
+    ? factors.map(f => `<div class="sa-factor">
+        <div class="sa-factor-icon">
+          <svg fill="none" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4"/>
+            <circle cx="12" cy="12" r="9" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="sa-factor-txt">${f}</div>
+      </div>`).join('')
+    : '<div style="font-size:12px;color:var(--text3);padding:8px 0">No factors recorded.</div>';
+
+  // Source
+  document.getElementById('sa-source').textContent = a.ai ? '🤖 Powered by Claude AI' : '📐 Rule-based analysis';
+
+  document.getElementById('sa-overlay').classList.add('open');
+}
+
+function closeSigAnalysis() {
+  document.getElementById('sa-overlay').classList.remove('open');
 }
 
 /* ── Phase Tracker ───────────────────────────────────── */
@@ -3006,7 +3108,7 @@ function renderSignals() {
     const srcTag = s.source === 'recovery' ? ' · ⏪ recovered'
                   : s.source === 'live'    ? ' · 🔴 live' : '';
 
-    const aiBlock = _renderAnalysis(s.analysis);
+    const aiBlock = _renderAnalysis(s.analysis, {symbol: sym, side: s.side || s.action});
     return `<div class="row" style="flex-direction:column;align-items:stretch;gap:5px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
         <div class="row-left">
@@ -3615,6 +3717,71 @@ setInterval(fetchPositions, 15000);
 setInterval(loadTicker, 60000);
 setInterval(loadMomentumAlerts, 300000);
 </script>
+
+<!-- ── Signal Analysis Full-Screen Overlay ── -->
+<div class="sa-overlay" id="sa-overlay" onclick="if(event.target===this)closeSigAnalysis()">
+  <div class="sa-sheet">
+    <div class="cs-handle"></div>
+
+    <!-- Hero: score ring + symbol + verdict -->
+    <div class="sa-hero">
+      <div class="sa-score-ring">
+        <svg width="72" height="72" viewBox="0 0 72 72">
+          <circle cx="36" cy="36" r="28" fill="none" stroke="var(--card2)" stroke-width="6"/>
+          <circle cx="36" cy="36" r="28" fill="none" id="sa-score-arc" stroke-width="6"
+            stroke-linecap="round" stroke-dasharray="175.9" stroke-dashoffset="87.9"
+            transform="rotate(-90 36 36)"/>
+        </svg>
+        <div class="sa-score-num" id="sa-score-num">—</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div class="sa-symbol" id="sa-symbol">—</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap">
+          <span id="sa-side-tag"></span>
+          <span class="ai-badge" id="sa-verdict-badge">—</span>
+        </div>
+        <div style="margin-top:6px">
+          <span class="ai-rec" id="sa-rec-badge" style="font-size:12px;padding:6px 14px">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Meta grid -->
+    <div class="sa-meta-grid">
+      <div class="sa-meta-box">
+        <div class="sa-meta-lbl">Risk : Reward</div>
+        <div class="sa-meta-val" id="sa-rr">—</div>
+      </div>
+      <div class="sa-meta-box">
+        <div class="sa-meta-lbl">Trend Alignment</div>
+        <div class="sa-meta-val" id="sa-trend">—</div>
+      </div>
+      <div class="sa-meta-box">
+        <div class="sa-meta-lbl">Leverage Risk</div>
+        <div class="sa-meta-val" id="sa-lev-risk">—</div>
+      </div>
+      <div class="sa-meta-box">
+        <div class="sa-meta-lbl">Confidence</div>
+        <div class="sa-meta-val" id="sa-conf">—</div>
+      </div>
+    </div>
+
+    <!-- Summary -->
+    <div class="sa-section-lbl">Summary</div>
+    <div class="sa-summary-box" id="sa-summary">—</div>
+
+    <!-- Key factors -->
+    <div class="sa-section-lbl">Key Factors</div>
+    <div id="sa-factors">—</div>
+
+    <!-- Source badge -->
+    <div style="margin-top:14px;text-align:center">
+      <span id="sa-source" style="font-size:10px;color:var(--text3);font-weight:600"></span>
+    </div>
+
+    <button class="btn btn-ghost btn-sm" onclick="closeSigAnalysis()" style="margin-top:16px;width:100%">Close</button>
+  </div>
+</div>
 </body>
 </html>"""
 
