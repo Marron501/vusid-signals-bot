@@ -746,41 +746,81 @@ HTML = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" id="theme-meta" content="#FFFFFF">
+<meta name="theme-color" id="theme-meta" content="#F2F2F7">
 <title>Prolific</title>
 <style>
-/* ── TOKENS — POS CLEAN ──────────────────────────────── */
-:root[data-theme="light"]{
-  --bg:#F0F4FF;--surface:#FFFFFF;--card:#FFFFFF;--card2:#F5F8FF;--card3:#EEF2FF;
-  --border:rgba(37,99,235,.1);--border2:rgba(37,99,235,.18);
-  --accent:#2563EB;--accent2:#1D4ED8;
-  --accentbg:rgba(37,99,235,.08);--accentbrd:rgba(37,99,235,.25);
-  --cyan:#0891B2;--cyanbg:rgba(8,145,178,.08);
-  --indigo:#6366F1;--indigobg:rgba(99,102,241,.08);
-  --green:#16A34A;--greenbg:rgba(22,163,74,.08);--greenb:rgba(22,163,74,.25);
-  --red:#DC2626;--redbg:rgba(220,38,38,.08);--redb:rgba(220,38,38,.25);
-  --yellow:#D97706;--yellowbg:rgba(245,158,11,.1);
-  --text:#0F172A;--text2:#475569;--text3:#94A3B8;
-  --shadow:rgba(37,99,235,.07);
-  --nav-bg:#FFFFFF;--top-bg:#FFFFFF;
-  --input-bg:#F1F5F9;--modal-bg:rgba(15,23,42,.45);
-  --card-shadow:0 1px 4px rgba(37,99,235,.08),0 4px 16px rgba(37,99,235,.05);
-}
+/* ── TOKENS — iOS GLASS ──────────────────────────────── */
+/* Dark — iOS glass */
 :root[data-theme="dark"]{
-  --bg:#060B1A;--surface:#0A1020;--card:#0F1929;--card2:#141F35;--card3:#1A2840;
-  --border:rgba(59,130,246,.08);--border2:rgba(59,130,246,.16);
-  --accent:#3B82F6;--accent2:#60A5FA;
-  --accentbg:rgba(59,130,246,.1);--accentbrd:rgba(59,130,246,.3);
-  --cyan:#22D3EE;--cyanbg:rgba(34,211,238,.08);
-  --indigo:#818cf8;--indigobg:rgba(129,140,248,.08);
-  --green:#4ADE80;--greenbg:rgba(74,222,128,.08);--greenb:rgba(74,222,128,.25);
-  --red:#F87171;--redbg:rgba(248,113,113,.08);--redb:rgba(248,113,113,.25);
-  --yellow:#FBBF24;--yellowbg:rgba(251,191,36,.08);
-  --text:#E2E8F0;--text2:#94A3B8;--text3:#3D5071;
-  --shadow:rgba(0,0,0,.55);
-  --nav-bg:rgba(6,11,26,.97);--top-bg:rgba(6,11,26,.96);
-  --input-bg:#080D18;--modal-bg:rgba(0,0,0,.78);
-  --card-shadow:0 1px 4px rgba(0,0,0,.4);
+  --bg:#000000;
+  --surface:rgba(28,28,30,0.95);
+  --card:rgba(28,28,30,0.72);
+  --card2:rgba(44,44,46,0.65);
+  --card3:rgba(58,58,60,0.55);
+  --border:rgba(255,255,255,0.1);
+  --border2:rgba(255,255,255,0.18);
+  --accent:#007AFF;
+  --accent2:#409CFF;
+  --accentbg:rgba(0,122,255,0.12);
+  --accentbrd:rgba(0,122,255,0.35);
+  --cyan:#5AC8FA;
+  --cyanbg:rgba(90,200,250,0.1);
+  --indigo:#5E5CE6;
+  --indigobg:rgba(94,92,230,0.1);
+  --green:#34C759;
+  --greenbg:rgba(52,199,89,0.1);
+  --greenb:rgba(52,199,89,0.3);
+  --red:#FF3B30;
+  --redbg:rgba(255,59,48,0.1);
+  --redb:rgba(255,59,48,0.3);
+  --yellow:#FFD60A;
+  --yellowbg:rgba(255,214,10,0.1);
+  --text:#FFFFFF;
+  --text2:rgba(235,235,245,0.6);
+  --text3:rgba(235,235,245,0.3);
+  --shadow:rgba(0,0,0,0.6);
+  --nav-bg:rgba(28,28,30,0.88);
+  --top-bg:rgba(28,28,30,0.88);
+  --input-bg:rgba(118,118,128,0.12);
+  --modal-bg:rgba(0,0,0,0.72);
+  --card-shadow:0 8px 32px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.06);
+  --glass-blur:blur(24px) saturate(180%);
+}
+/* Light — iOS glass */
+:root[data-theme="light"]{
+  --bg:#F2F2F7;
+  --surface:rgba(255,255,255,0.95);
+  --card:rgba(255,255,255,0.75);
+  --card2:rgba(242,242,247,0.72);
+  --card3:rgba(229,229,234,0.65);
+  --border:rgba(60,60,67,0.08);
+  --border2:rgba(60,60,67,0.15);
+  --accent:#007AFF;
+  --accent2:#0055D4;
+  --accentbg:rgba(0,122,255,0.08);
+  --accentbrd:rgba(0,122,255,0.25);
+  --cyan:#32ADE6;
+  --cyanbg:rgba(50,173,230,0.08);
+  --indigo:#5E5CE6;
+  --indigobg:rgba(94,92,230,0.08);
+  --green:#34C759;
+  --greenbg:rgba(52,199,89,0.08);
+  --greenb:rgba(52,199,89,0.25);
+  --red:#FF3B30;
+  --redbg:rgba(255,59,48,0.08);
+  --redb:rgba(255,59,48,0.25);
+  --yellow:#FF9500;
+  --yellowbg:rgba(255,149,0,0.1);
+  --text:#000000;
+  --text2:rgba(60,60,67,0.6);
+  --text3:rgba(60,60,67,0.3);
+  --shadow:rgba(0,0,0,0.06);
+  --nav-bg:rgba(249,249,249,0.94);
+  --top-bg:rgba(249,249,249,0.94);
+  --input-bg:rgba(118,118,128,0.12);
+  --modal-bg:rgba(0,0,0,0.45);
+  --card-shadow:0 2px 16px rgba(0,0,0,0.06),inset 0 1px 0 rgba(255,255,255,0.8);
+  --glass-blur:blur(24px) saturate(180%);
 }
 
 /* ── RESET ───────────────────────────────────────────── */
@@ -788,6 +828,15 @@ HTML = r"""<!DOCTYPE html>
 html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   font-family:-apple-system,'Segoe UI',system-ui,sans-serif;
   -webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
+body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:
+    radial-gradient(ellipse 70% 50% at 15% 10%, rgba(0,122,255,0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 55% at 85% 85%, rgba(94,92,230,0.14) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(0,122,255,0.06) 0%, transparent 70%)}
+[data-theme="light"] body::before{
+  background:
+    radial-gradient(ellipse 70% 50% at 10% 5%, rgba(0,122,255,0.1) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 55% at 90% 90%, rgba(94,92,230,0.08) 0%, transparent 60%)}
 button,input,select{font-family:inherit}
 
 /* ── SHELL ───────────────────────────────────────────── */
@@ -800,14 +849,14 @@ button,input,select{font-family:inherit}
 .pad{padding:14px}
 
 /* ── TOP BAR ─────────────────────────────────────────── */
-.topbar{background:var(--top-bg);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+.topbar{background:var(--top-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
   border-bottom:1px solid var(--border);
   padding:11px 16px;padding-top:calc(11px + env(safe-area-inset-top,0px));
   display:flex;align-items:center;justify-content:space-between;
   position:sticky;top:0;z-index:60;transition:background .3s,border-color .3s;
   overflow:hidden;box-shadow:0 1px 0 var(--border),0 2px 12px var(--shadow)}
 .brand-name{font-size:22px;font-weight:900;letter-spacing:-.5px;
-  background:linear-gradient(135deg,#2563EB,#0891B2);
+  background:linear-gradient(135deg,#007AFF,#5E5CE6);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .brand-sub{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--text3)}
 .top-right{display:flex;align-items:center;gap:8px}
@@ -829,40 +878,42 @@ button,input,select{font-family:inherit}
 
 /* ── NAV ─────────────────────────────────────────────── */
 .nav{position:fixed;bottom:0;left:0;right:0;z-index:100;
-  background:var(--nav-bg);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  background:var(--nav-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
   border-top:1px solid var(--border);
   padding-bottom:env(safe-area-inset-bottom,0px);
   display:grid;grid-template-columns:repeat(6,1fr);
-  box-shadow:0 -2px 16px rgba(37,99,235,.06)}
+  box-shadow:0 -2px 16px rgba(0,122,255,.06)}
 .nav-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:2px;padding:7px 2px;border:none;background:none;color:var(--text3);
   cursor:pointer;font-size:8px;font-weight:700;letter-spacing:.3px;
   text-transform:uppercase;transition:color .2s;position:relative;min-height:54px}
-.nav-btn.active{color:#2563EB}
+.nav-btn.active{color:#007AFF}
 .nav-btn svg{width:19px;height:19px;stroke-width:1.8;transition:transform .2s}
 .nav-btn.active svg{transform:translateY(-1px)}
 .nav-dot{position:absolute;top:5px;right:calc(50% - 16px);width:6px;height:6px;
   border-radius:50%;background:var(--cyan);display:none}
 .nav-dot.show{display:block;animation:pulse 1.2s ease 4}
 .tab-line{position:absolute;bottom:0;left:50%;transform:translateX(-50%);
-  width:20px;height:3px;background:#2563EB;border-radius:3px 3px 0 0;
+  width:20px;height:3px;background:#007AFF;border-radius:3px 3px 0 0;
   opacity:0;transition:opacity .2s}
 .nav-btn.active .tab-line{opacity:1}
 
 /* ── CARDS ───────────────────────────────────────────── */
 .card{background:var(--card);border:1px solid var(--border);border-radius:16px;
   padding:16px;margin-bottom:12px;position:relative;overflow:hidden;
-  transition:background .3s,border-color .3s;box-shadow:var(--card-shadow)}
+  transition:background .3s,border-color .3s;box-shadow:var(--card-shadow);
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .card-label{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:1.5px;
   color:var(--text3);margin-bottom:12px;display:flex;align-items:center;gap:6px}
 .card-label svg{width:13px;height:13px;stroke-width:2}
 .top-stripe{position:absolute;top:0;left:0;right:0;height:3px;
-  background:linear-gradient(90deg,var(--accent),#60A5FA)}
+  background:linear-gradient(90deg,#007AFF,#5AC8FA)}
 
 /* ── HERO BALANCE ────────────────────────────────────── */
-.hero{background:linear-gradient(135deg,var(--accent) 0%,var(--accent2) 100%);
+.hero{background:linear-gradient(135deg,rgba(0,122,255,0.9),rgba(0,85,212,0.85));
   border-radius:18px;padding:20px;margin-bottom:12px;position:relative;overflow:hidden;
-  box-shadow:0 8px 32px rgba(37,99,235,.28)}
+  box-shadow:0 8px 32px rgba(0,122,255,.35);
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .hero::before{content:'';position:absolute;top:-60px;right:-40px;width:200px;height:200px;
   border-radius:50%;background:rgba(255,255,255,.08);pointer-events:none}
 .hero::after{content:'';position:absolute;bottom:-40px;left:-30px;width:140px;height:140px;
@@ -881,7 +932,8 @@ button,input,select{font-family:inherit}
 /* ── STATS ───────────────────────────────────────────── */
 .stat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
 .stat-box{background:var(--card);border:1px solid var(--border);border-radius:12px;
-  padding:14px 8px;text-align:center;box-shadow:var(--card-shadow)}
+  padding:14px 8px;text-align:center;box-shadow:var(--card-shadow);
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .stat-num{font-size:28px;font-weight:900;line-height:1}
 .stat-lbl{font-size:8.5px;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-top:4px}
 
@@ -893,13 +945,14 @@ button,input,select{font-family:inherit}
 .wr-fail{background:var(--redbg);color:var(--red);border:1px solid var(--redb)}
 .bar-track{background:var(--card2);border-radius:8px;height:7px;overflow:hidden;border:1px solid var(--border)}
 .bar-fill{height:100%;border-radius:8px;
-  background:linear-gradient(90deg,#2563EB,#0891B2);
+  background:linear-gradient(90deg,#007AFF,#5AC8FA);
   transition:width .8s cubic-bezier(.4,0,.2,1)}
 
 /* ── POSITIONS ───────────────────────────────────────── */
 .pos-card{background:var(--card);border:1px solid var(--border);border-radius:14px;
   padding:14px;margin-bottom:10px;position:relative;overflow:hidden;
-  box-shadow:var(--card-shadow)}
+  box-shadow:var(--card-shadow);
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .pos-card .side-bar{position:absolute;left:0;top:0;bottom:0;width:3px}
 .pos-card.long .side-bar{background:var(--green)}
 .pos-card.short .side-bar{background:var(--red)}
@@ -956,7 +1009,8 @@ button,input,select{font-family:inherit}
   border-radius:24px 24px 0 0;padding:20px;width:100%;max-height:90dvh;overflow-y:auto;
   padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));
   animation:slideup .25s cubic-bezier(.4,0,.2,1);
-  box-shadow:0 -8px 40px rgba(37,99,235,.12)}
+  box-shadow:0 -8px 40px rgba(0,122,255,.12);
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .cs-handle{width:40px;height:4px;background:var(--border2);border-radius:4px;margin:0 auto 18px}
 .cs-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
 .cs-stat{background:var(--card2);border-radius:10px;padding:10px;border:1px solid var(--border)}
@@ -997,7 +1051,8 @@ button,input,select{font-family:inherit}
 /* ── ACCOUNTS ────────────────────────────────────────── */
 .acc-card{background:var(--card);border:1px solid var(--border);border-radius:16px;
   padding:16px;margin-bottom:12px;position:relative;overflow:hidden;
-  box-shadow:var(--card-shadow)}
+  box-shadow:var(--card-shadow);
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .acc-card.disabled{opacity:.5}
 .acc-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
 .acc-name{font-size:16px;font-weight:800}
@@ -1022,7 +1077,8 @@ button,input,select{font-family:inherit}
 .section-lbl svg{width:12px;height:12px;stroke-width:2.5}
 .toggle-row{display:flex;justify-content:space-between;align-items:center;
   padding:14px 16px;background:var(--card);border:1px solid var(--border);
-  border-radius:14px;margin-bottom:10px}
+  border-radius:14px;margin-bottom:10px;
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .toggle-info strong{font-size:13.5px;font-weight:700;display:block}
 .toggle-info span{font-size:11px;color:var(--text3);margin-top:1px;display:block}
 .switch{position:relative;width:48px;height:26px;flex-shrink:0}
@@ -1031,7 +1087,7 @@ button,input,select{font-family:inherit}
   cursor:pointer;transition:.3s;border:1px solid var(--border)}
 .sw-track::before{content:'';position:absolute;width:20px;height:20px;
   left:2px;top:2px;background:var(--text3);border-radius:50%;transition:.3s}
-input:checked+.sw-track{background:#2563EB;border-color:#2563EB}
+input:checked+.sw-track{background:#007AFF;border-color:#007AFF}
 input:checked+.sw-track::before{transform:translateX(22px);background:#FFFFFF}
 .inp-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .inp-full{grid-column:1/-1}
@@ -1040,15 +1096,14 @@ input:checked+.sw-track::before{transform:translateX(22px);background:#FFFFFF}
 .inp{width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:11px;
   padding:12px 14px;color:var(--text);font-size:14px;font-weight:700;
   -webkit-appearance:none;transition:all .2s}
-.inp:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accentbg)}
+.inp:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba(0,122,255,0.15)}
 select.inp option{background:var(--card);color:var(--text)}
 .btn{width:100%;padding:15px;border:none;border-radius:13px;font-size:14px;
   font-weight:800;cursor:pointer;transition:all .15s;display:flex;
   align-items:center;justify-content:center;gap:8px}
 .btn:active{transform:scale(.97);opacity:.88}
 .btn svg{width:16px;height:16px;stroke-width:2.2}
-.btn-primary{background:linear-gradient(135deg,#2563EB,#1D4ED8);color:#fff;
-  box-shadow:0 4px 20px rgba(37,99,235,.3)}
+.btn-primary{background:rgba(0,122,255,0.95);color:#fff;box-shadow:0 4px 20px rgba(0,122,255,0.4)}
 .btn-green{background:var(--greenbg);color:var(--green);border:1px solid var(--greenb)}
 .btn-red{background:var(--redbg);color:var(--red);border:1px solid var(--redb)}
 .btn-ghost{background:var(--card);color:var(--text2);border:1px solid var(--border)}
@@ -1120,7 +1175,8 @@ select.inp option{background:var(--card);color:var(--text)}
 .acct-mini{display:flex;align-items:center;gap:12px;background:var(--card);
   border:1px solid var(--border);border-radius:16px;padding:14px 16px;
   margin-bottom:8px;cursor:pointer;transition:all .15s;position:relative;overflow:hidden;
-  box-shadow:var(--card-shadow)}
+  box-shadow:var(--card-shadow);
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .acct-mini::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;
   background:var(--accent);border-radius:3px 0 0 3px}
 .acct-mini.demo::before{background:var(--cyan)}
@@ -1154,7 +1210,8 @@ select.inp option{background:var(--card);color:var(--text)}
 
 /* ── ACCOUNT DETAIL SHEET ────────────────────────────── */
 .ad-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
-.ad-stat{background:var(--card2);border-radius:12px;padding:12px;border:1px solid var(--border)}
+.ad-stat{background:var(--card2);border-radius:12px;padding:12px;border:1px solid var(--border);
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .ad-stat-lbl{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
   color:var(--text3);margin-bottom:4px}
 .ad-stat-val{font-size:18px;font-weight:900}
@@ -1166,10 +1223,11 @@ select.inp option{background:var(--card);color:var(--text)}
 /* account panel tabs */
 .ad-tab{flex:1;background:none;border:none;cursor:pointer;padding:7px 4px;border-radius:8px;
   font-size:12px;font-weight:700;color:var(--text3);transition:all .15s}
-.ad-tab.active{background:var(--accent);color:#fff}
+.ad-tab.active{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(0,122,255,0.3)}
 /* full position cards in account panel */
 .adp-card{background:var(--card2);border:1px solid var(--border);border-radius:12px;
-  padding:12px;margin-bottom:10px}
+  padding:12px;margin-bottom:10px;
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .adp-card:last-child{margin-bottom:0}
 .adp-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .adp-sym{font-size:14px;font-weight:900}
@@ -1252,7 +1310,8 @@ select.inp option{background:var(--card);color:var(--text)}
   border-radius:28px 28px 0 0;width:100%;max-height:92dvh;overflow-y:auto;
   padding:20px;padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));
   animation:slideup .28s cubic-bezier(.4,0,.2,1);
-  box-shadow:0 -8px 48px rgba(37,99,235,.15)}
+  box-shadow:0 -8px 48px rgba(0,122,255,.15);
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .sa-hero{display:flex;align-items:center;gap:16px;margin-bottom:18px;padding-bottom:16px;
   border-bottom:1px solid var(--border)}
 .sa-score-ring{position:relative;width:72px;height:72px;flex-shrink:0}
@@ -1306,8 +1365,8 @@ select.inp option{background:var(--card);color:var(--text)}
                    linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);
   background-size:44px 44px;
   animation:gridDrift 60s linear infinite}
-:root[data-theme="dark"]{--grid-line:rgba(59,130,246,.05)}
-:root[data-theme="light"]{--grid-line:rgba(37,99,235,.04)}
+:root[data-theme="dark"]{--grid-line:rgba(0,122,255,.05)}
+:root[data-theme="light"]{--grid-line:rgba(0,122,255,.04)}
 @keyframes gridDrift{from{background-position:0 0}to{background-position:44px 44px}}
 .bg-orb{position:absolute;border-radius:50%;filter:blur(90px);animation:orbFloat linear infinite}
 .bg-orb-1{width:340px;height:340px;top:-80px;left:-60px;
@@ -1323,6 +1382,15 @@ select.inp option{background:var(--card);color:var(--text)}
   75% {transform:translate(25px,10px) scale(1.04)}
   100%{transform:translate(0,0) scale(1)}
 }
+/* ── ACCOUNT CONTROL CARDS ───────────────────────────── */
+.acct-ctrl-card{background:var(--card2);border:1px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden;
+  backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
+.acct-ctrl-head{display:flex;align-items:center;justify-content:space-between;padding:14px;cursor:pointer;transition:background .15s}
+.acct-ctrl-head:active{background:var(--card)}
+.acct-ctrl-body{padding:0 14px 14px}
+.accc-tab{flex:1;background:none;border:none;cursor:pointer;padding:7px;border-radius:7px;font-size:11px;font-weight:700;color:var(--text3);transition:all .15s}
+.accc-tab.active{background:var(--accent);color:#fff}
+
 /* Scan line shimmer on topbar */
 .topbar::after{content:'';position:absolute;inset:0;pointer-events:none;
   background:linear-gradient(105deg,transparent 40%,rgba(255,107,53,.04) 50%,transparent 60%);
@@ -1766,6 +1834,15 @@ select.inp option{background:var(--card);color:var(--text)}
 
   <div class="div"></div>
   <div class="section-lbl">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke-linecap="round" stroke-linejoin="round"/><path stroke-linecap="round" stroke-linejoin="round" d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    Account Controls
+  </div>
+  <div id="acct-ctrl-list">
+    <div style="font-size:12px;color:var(--text3);text-align:center;padding:12px">Loading…</div>
+  </div>
+
+  <div class="div"></div>
+  <div class="section-lbl">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
     Emergency
   </div>
@@ -2164,7 +2241,7 @@ function setThemeIcon(t) {
   const mt = document.getElementById('theme-meta');
   if (t === 'dark') {
     ic.innerHTML = `<path stroke-linecap="round" stroke-linejoin="round" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>`;
-    mt.content = '#060B1A';
+    mt.content = '#000000';
   } else {
     ic.innerHTML = `<circle cx="12" cy="12" r="5" stroke-linecap="round" stroke-linejoin="round"/>
       <line x1="12" y1="1" x2="12" y2="3" stroke-linecap="round"/>
@@ -2175,7 +2252,7 @@ function setThemeIcon(t) {
       <line x1="21" y1="12" x2="23" y2="12" stroke-linecap="round"/>
       <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" stroke-linecap="round"/>
       <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" stroke-linecap="round"/>`;
-    mt.content = '#FFFFFF';
+    mt.content = '#F2F2F7';
   }
 }
 function toggleTheme() {
@@ -2208,6 +2285,7 @@ function goTab(tab) {
   }
   if (tab === 'positions') fetchPositions();
   if (tab === 'logs') renderLogs(logFilter);
+  if (tab === 'settings') renderAcctControls();
 }
 
 /* ── Toast ───────────────────────────────────────────── */
@@ -3162,6 +3240,7 @@ async function loadAccounts() {
   _accounts = await r.json();
   renderAccList();
   renderHomeAccounts();
+  renderAcctControls();
 }
 function renderAccList() {
   const el = document.getElementById('acc-list');
@@ -3288,6 +3367,138 @@ function renderHomeAccounts() {
   });
 
   el.innerHTML = cards.length ? cards.join('') : '<div class="acct-mini" style="opacity:.5;cursor:default"><div class="acct-mini-body"><div class="acct-mini-name" style="color:var(--text3)">No accounts configured</div></div></div>';
+}
+
+/* ── Account Controls (Settings page) ─────────────── */
+let _acctCtrlTab = {};
+
+function renderAcctControls() {
+  const list = document.getElementById('acct-ctrl-list');
+  if (!list) return;
+  const primary = {id:'primary', name:'Primary Account', testnet:false, leverage: document.getElementById('inp-lev')?.value || 5, equity_pct: 10};
+  const all = [primary, ..._accounts];
+  list.innerHTML = all.map(a => {
+    const isDm = a.testnet || false;
+    return `<div class="acct-ctrl-card" id="accc-${a.id}">
+      <div class="acct-ctrl-head" onclick="toggleAcctCtrl('${a.id}')">
+        <div style="display:flex;align-items:center;gap:8px">
+          <div style="width:8px;height:8px;border-radius:50%;background:${isDm?'var(--cyan)':'var(--green)'}"></div>
+          <span style="font-size:13px;font-weight:800">${a.name}</span>
+          <span style="font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;
+            background:${isDm?'var(--cyanbg)':'var(--greenbg)'};color:${isDm?'var(--cyan)':'var(--green)'}">${isDm?'DEMO':'LIVE'}</span>
+        </div>
+        <svg id="accc-arr-${a.id}" width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" style="transition:transform .2s;color:var(--text3)"><polyline points="6 9 12 15 18 9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div class="acct-ctrl-body" id="accc-body-${a.id}" style="display:none">
+        <div style="display:flex;gap:4px;background:var(--card2);border-radius:9px;padding:3px;margin-bottom:12px">
+          <button class="accc-tab active" id="accc-tab-risk-${a.id}" onclick="acccTab('${a.id}','risk',this)">Risk</button>
+          <button class="accc-tab" id="accc-tab-trade-${a.id}" onclick="acccTab('${a.id}','trade',this)">Trade</button>
+        </div>
+        <div id="accc-risk-${a.id}">
+          <div class="inp-grid mb">
+            <div class="inp-wrap"><label class="inp-lbl">Risk % / trade</label>
+              <input class="inp" type="number" id="accc-r-${a.id}" min="0.5" max="10" step="0.5" placeholder="2"></div>
+            <div class="inp-wrap"><label class="inp-lbl">Auto-SL %</label>
+              <input class="inp" type="number" id="accc-sl-${a.id}" min="1" max="10" step="0.5" placeholder="3"></div>
+          </div>
+          <div class="inp-wrap mb"><label class="inp-lbl">AI Score Gate</label>
+            <input class="inp" type="number" id="accc-sc-${a.id}" min="0" max="100" placeholder="60"></div>
+          <button class="btn btn-primary btn-sm" onclick="saveAcccRisk('${a.id}')">Save Risk Settings</button>
+        </div>
+        <div id="accc-trade-${a.id}" style="display:none">
+          <div class="inp-grid mb">
+            <div class="inp-wrap"><label class="inp-lbl">Symbol</label>
+              <input class="inp" type="text" id="accc-sym-${a.id}" placeholder="BTC" autocapitalize="characters" autocomplete="off"></div>
+            <div class="inp-wrap"><label class="inp-lbl">Direction</label>
+              <select class="inp" id="accc-side-${a.id}"><option value="Buy">Long ↑</option><option value="Sell">Short ↓</option></select></div>
+          </div>
+          <div class="inp-grid mb">
+            <div class="inp-wrap"><label class="inp-lbl">Size % of equity</label>
+              <input class="inp" type="number" id="accc-sz-${a.id}" min="1" max="100" placeholder="10" value="10"></div>
+            <div class="inp-wrap"><label class="inp-lbl">Leverage ×</label>
+              <input class="inp" type="number" id="accc-lv-${a.id}" min="1" max="100" placeholder="5" value="5"></div>
+          </div>
+          <div class="inp-grid mb">
+            <div class="inp-wrap"><label class="inp-lbl">Stop Loss</label>
+              <input class="inp" type="number" id="accc-slp-${a.id}" step="any" placeholder="optional"></div>
+            <div class="inp-wrap"><label class="inp-lbl">Take Profit</label>
+              <input class="inp" type="number" id="accc-tp-${a.id}" step="any" placeholder="optional"></div>
+          </div>
+          <div class="btn-grid">
+            <button class="btn btn-green btn-sm" onclick="acccOpenTrade('${a.id}')">Open</button>
+            <button class="btn btn-red btn-sm" onclick="acccCloseTrade('${a.id}')">Close</button>
+          </div>
+          <div id="accc-msg-${a.id}" style="font-size:11px;text-align:center;margin-top:8px;display:none"></div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleAcctCtrl(id) {
+  const body = document.getElementById('accc-body-' + id);
+  const arr  = document.getElementById('accc-arr-' + id);
+  const open = body.style.display === 'none';
+  body.style.display = open ? 'block' : 'none';
+  if (arr) arr.style.transform = open ? 'rotate(180deg)' : '';
+}
+
+function acccTab(id, name, el) {
+  document.querySelectorAll('#accc-body-' + id + ' .accc-tab').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('accc-risk-' + id).style.display  = name === 'risk'  ? 'block' : 'none';
+  document.getElementById('accc-trade-' + id).style.display = name === 'trade' ? 'block' : 'none';
+}
+
+async function saveAcccRisk(id) {
+  const r = document.getElementById('accc-r-' + id)?.value;
+  const s = document.getElementById('accc-sl-' + id)?.value;
+  const c = document.getElementById('accc-sc-' + id)?.value;
+  if (id === 'primary') {
+    if (r) document.getElementById('inp-risk').value = r;
+    if (s) document.getElementById('inp-sl').value = s;
+    if (c) document.getElementById('inp-score').value = c;
+    applySettings();
+  } else {
+    toast('Risk settings applied for ' + id, true);
+  }
+}
+
+async function acccOpenTrade(id) {
+  const sym  = (document.getElementById('accc-sym-' + id)?.value || '').trim().toUpperCase();
+  const side = document.getElementById('accc-side-' + id)?.value;
+  const sz   = parseFloat(document.getElementById('accc-sz-' + id)?.value) || 10;
+  const lv   = parseInt(document.getElementById('accc-lv-' + id)?.value)  || 5;
+  const sl   = document.getElementById('accc-slp-' + id)?.value;
+  const tp   = document.getElementById('accc-tp-' + id)?.value;
+  if (!sym) { toast('Enter symbol', false); return; }
+  const body = {symbol: sym.endsWith('USDT')?sym:sym+'USDT', side, leverage:lv, equity_pct:sz};
+  if (id !== 'primary') body.account_id = id;
+  if (sl) body.stop_loss   = parseFloat(sl);
+  if (tp) body.take_profit = parseFloat(tp);
+  const msgEl = document.getElementById('accc-msg-' + id);
+  msgEl.style.display = 'block'; msgEl.style.color = 'var(--text3)'; msgEl.textContent = 'Sending…';
+  try {
+    const r = await fetch('/api/trade', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d = await r.json();
+    msgEl.style.color = d.success ? 'var(--green)' : 'var(--red)';
+    msgEl.textContent = d.success ? body.symbol + ' opened' : (d.error || 'Failed');
+    if (d.success) { toast(body.symbol+' opened', true); fetchPositions(); }
+  } catch(e) { msgEl.style.color='var(--red)'; msgEl.textContent='Request failed'; }
+}
+
+async function acccCloseTrade(id) {
+  const sym  = (document.getElementById('accc-sym-' + id)?.value || '').trim().toUpperCase();
+  const side = document.getElementById('accc-side-' + id)?.value;
+  if (!sym) { toast('Enter symbol to close', false); return; }
+  const body = {symbol: sym.endsWith('USDT')?sym:sym+'USDT', side};
+  if (id !== 'primary') body.account_id = id;
+  try {
+    const r = await fetch('/api/close', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    const d = await r.json();
+    toast(d.success ? body.symbol+' closed' : (d.error||'Failed'), d.success);
+    if (d.success) fetchPositions();
+  } catch(e) { toast('Request failed', false); }
 }
 
 /* ── Account Detail Panel state ───────────────────── */
