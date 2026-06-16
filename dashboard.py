@@ -617,6 +617,7 @@ def api_close_all():
 
 
 _mkt_cache = {"data": [], "ts": 0}
+_fng_cache = {"data": None, "ts": 0}
 
 @app.route("/api/market-ticker")
 def api_market_ticker():
@@ -645,6 +646,29 @@ def api_market_ticker():
     except Exception as e:
         log.error(f"market-ticker: {e}")
         return jsonify(_mkt_cache["data"] or {"gainers": [], "losers": []})
+
+
+@app.route("/api/fear-greed")
+def api_fear_greed():
+    """Crypto Fear & Greed Index from alternative.me — cached 5 min."""
+    global _fng_cache
+    if time.time() - _fng_cache["ts"] < 300 and _fng_cache["data"]:
+        return jsonify(_fng_cache["data"])
+    try:
+        r = requests.get("https://api.alternative.me/fng/?limit=1", timeout=8)
+        d = r.json()["data"][0]
+        result = {
+            "value":          int(d["value"]),
+            "classification": d["value_classification"],
+            "updated":        int(d["timestamp"]),
+        }
+        _fng_cache = {"data": result, "ts": time.time()}
+        return jsonify(result)
+    except Exception as e:
+        log.error(f"fear-greed: {e}")
+        if _fng_cache["data"]:
+            return jsonify(_fng_cache["data"])
+        return jsonify({"value": None, "classification": "Unknown", "updated": 0})
 
 
 @app.route("/api/set-sl-tp", methods=["POST"])
@@ -1609,6 +1633,53 @@ select.inp option{background:var(--card);color:var(--text)}
       <div style="display:none" id="cfg-auto"></div>
       <div style="display:none" id="cfg-eq"></div>
       <div style="display:none" id="cfg-lev"></div>
+    </div>
+  </div>
+
+  <!-- Fear & Greed Index -->
+  <div class="card" id="fng-card" style="margin-bottom:12px;padding:14px 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--text3)">CRYPTO FEAR &amp; GREED</div>
+      <div style="font-size:9px;color:var(--text3)" id="fng-updated">Updating…</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <!-- Dial -->
+      <div style="position:relative;width:80px;height:44px;flex-shrink:0">
+        <svg width="80" height="44" viewBox="0 0 80 44">
+          <!-- track arc: semicircle radius 36, centre 40,40 -->
+          <path d="M4,40 A36,36 0 0,1 76,40" fill="none" stroke="rgba(128,128,128,.15)" stroke-width="8" stroke-linecap="round"/>
+          <!-- coloured fill arc -->
+          <path id="fng-arc" d="M4,40 A36,36 0 0,1 76,40" fill="none"
+            stroke="#FF3B30" stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="113" stroke-dashoffset="113"
+            style="transition:stroke-dashoffset .8s cubic-bezier(.4,0,.2,1),stroke .4s"/>
+          <!-- needle -->
+          <line id="fng-needle" x1="40" y1="40" x2="40" y2="8"
+            stroke="var(--text)" stroke-width="2" stroke-linecap="round"
+            style="transform-origin:40px 40px;transform:rotate(-90deg);transition:transform .8s cubic-bezier(.4,0,.2,1)"/>
+          <circle cx="40" cy="40" r="3" fill="var(--text)"/>
+        </svg>
+        <div id="fng-val" style="position:absolute;bottom:0;left:0;right:0;text-align:center;
+          font-size:22px;font-weight:900;letter-spacing:-1px;color:var(--text);line-height:1">—</div>
+      </div>
+      <!-- Label + zone bar -->
+      <div style="flex:1;min-width:0">
+        <div id="fng-label" style="font-size:16px;font-weight:900;letter-spacing:-.4px;
+          color:var(--text);margin-bottom:6px">—</div>
+        <!-- 5-zone gradient bar -->
+        <div style="height:5px;border-radius:3px;background:linear-gradient(90deg,
+          #FF3B30 0%,#FF9500 25%,#FFD60A 50%,#34C759 75%,#00C7BE 100%);
+          margin-bottom:6px;position:relative">
+          <div id="fng-marker" style="position:absolute;top:-3px;width:10px;height:10px;
+            border-radius:50%;background:#fff;border:2px solid var(--text);
+            transform:translateX(-50%);left:50%;
+            transition:left .8s cubic-bezier(.4,0,.2,1)"></div>
+        </div>
+        <!-- Zone labels -->
+        <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--text3);font-weight:700">
+          <span>Ext. Fear</span><span>Fear</span><span>Neutral</span><span>Greed</span><span>Ext. Greed</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -4182,6 +4253,53 @@ function tick() {
   if (countdown <= 0) { countdown = 12; fetchData(); }
 }
 
+/* ── Fear & Greed Index ───────────────────────────────── */
+async function fetchFearGreed() {
+  try {
+    const r = await fetch('/api/fear-greed');
+    if (!r.ok) return;
+    const d = await r.json();
+    if (d.value == null) return;
+
+    const v   = d.value;                   // 0-100
+    const lbl = d.classification;
+
+    // Colour: Ext Fear → red, Fear → orange, Neutral → yellow, Greed → green, Ext Greed → teal
+    const col = v <= 24 ? '#FF3B30'
+              : v <= 49 ? '#FF9500'
+              : v <= 54 ? '#FFD60A'
+              : v <= 74 ? '#34C759'
+              :            '#00C7BE';
+
+    // Arc: semicircle path length = π × r = π × 36 ≈ 113.1
+    const arcLen = 113.1;
+    const offset = arcLen - (v / 100) * arcLen;
+    const arc    = document.getElementById('fng-arc');
+    if (arc) { arc.style.strokeDashoffset = offset; arc.style.stroke = col; }
+
+    // Needle: -90° (left, value=0) → +90° (right, value=100), centred at 0°=top
+    const deg = -90 + (v / 100) * 180;
+    const needle = document.getElementById('fng-needle');
+    if (needle) needle.style.transform = `rotate(${deg}deg)`;
+
+    // Marker on gradient bar
+    const marker = document.getElementById('fng-marker');
+    if (marker) marker.style.left = v + '%';
+
+    const valEl = document.getElementById('fng-val');
+    if (valEl) { valEl.textContent = v; valEl.style.color = col; }
+
+    const lblEl = document.getElementById('fng-label');
+    if (lblEl) { lblEl.textContent = lbl; lblEl.style.color = col; }
+
+    const upEl = document.getElementById('fng-updated');
+    if (upEl && d.updated) {
+      const mins = Math.round((Date.now()/1000 - d.updated) / 60);
+      upEl.textContent = mins < 2 ? 'Just updated' : `${mins}m ago`;
+    }
+  } catch(e) { /* silent fail */ }
+}
+
 /* ── Boot ────────────────────────────────────────────── */
 _restorePanels();
 _adRestorePropCfg();
@@ -4190,11 +4308,13 @@ fetchPositions();
 loadAccounts();
 loadTicker();
 loadMomentumAlerts();
+fetchFearGreed();
 connectSSE();
 setInterval(tick, 1000);
 setInterval(fetchPositions, 15000);
 setInterval(loadTicker, 60000);
 setInterval(loadMomentumAlerts, 300000);
+setInterval(fetchFearGreed, 300000);
 </script>
 
 <!-- ── Risk Strategy Detail Sheet ── -->
