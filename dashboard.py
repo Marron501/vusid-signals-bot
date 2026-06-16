@@ -1484,7 +1484,20 @@ select.inp option{background:var(--card);color:var(--text)}
 
   <!-- Hero balance -->
   <div class="hero">
-    <div class="hero-lbl">Primary Balance</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
+      <div class="hero-lbl">Primary Balance</div>
+      <button onclick="toggleBalVis()" id="bal-vis-btn" style="background:rgba(255,255,255,.15);
+        border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:4px 8px;cursor:pointer;
+        display:flex;align-items:center;gap:4px;font-size:9px;font-weight:700;color:rgba(255,255,255,.8)">
+        <svg id="bal-vis-icon" width="13" height="13" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor" stroke-width="2.2">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span id="bal-vis-lbl">Hide</span>
+      </button>
+    </div>
     <div class="hero-amt" id="b-equity">— USDT</div>
     <div class="hero-sub">Bybit Unified · <span id="b-ts">—</span></div>
     <div class="bal-grid">
@@ -1785,32 +1798,35 @@ select.inp option{background:var(--card);color:var(--text)}
   </div>
 
   <div class="div"></div>
-  <div class="section-lbl">
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-    Risk Strategy
-  </div>
-  <div style="background:var(--card2);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:var(--text3);line-height:1.6">
-    Position size is calculated from your risk %, not equity %. If risk=2% and SL=3% from entry,
-    the bot sizes the position so a SL hit costs exactly 2% of your account.
-  </div>
-  <div class="inp-grid mb">
-    <div class="inp-wrap">
-      <label class="inp-lbl">Risk % / trade</label>
-      <input class="inp" type="number" id="inp-risk" min="0.5" max="10" step="0.5" placeholder="2">
+  <!-- Risk Strategy — tap to open detail sheet -->
+  <div onclick="openRiskDetail()" style="display:flex;align-items:center;justify-content:space-between;
+    background:var(--card);border:1px solid var(--border);border-radius:14px;
+    padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:all .15s;
+    backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)">
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="width:36px;height:36px;border-radius:10px;background:var(--accentbg);
+        display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="var(--accent)" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+        </svg>
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:800">Risk Strategy</div>
+        <div style="font-size:10px;color:var(--text3);margin-top:1px">Phase · Sizing · Score gate</div>
+      </div>
     </div>
-    <div class="inp-wrap">
-      <label class="inp-lbl">Auto-SL %</label>
-      <input class="inp" type="number" id="inp-sl" min="1" max="10" step="0.5" placeholder="3">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span id="settings-risk-preview" style="font-size:11px;font-weight:700;color:var(--accent)">2% risk</span>
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+        stroke-width="2.5" style="color:var(--text3)">
+        <polyline points="9 18 15 12 9 6" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
     </div>
   </div>
-  <div class="inp-wrap mb">
-    <label class="inp-lbl">AI Score Gate (0 = disabled)</label>
-    <input class="inp" type="number" id="inp-score" min="0" max="100" placeholder="60">
-  </div>
-  <button class="btn btn-primary mb" onclick="applySettings()">
-    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-    Apply Settings
-  </button>
+  <!-- Hidden inputs still needed for applySettings() -->
+  <input type="hidden" id="inp-risk" value="2">
+  <input type="hidden" id="inp-sl"   value="3">
+  <input type="hidden" id="inp-score" value="60">
 
   <div class="div"></div>
   <div class="section-lbl">
@@ -2392,6 +2408,7 @@ function render() {
   document.getElementById('b-pertrade').textContent = (acc.equity * d.equity_fraction).toFixed(2);
   document.getElementById('b-lev').textContent      = d.default_leverage;
   document.getElementById('b-ts').textContent       = new Date(d.timestamp).toLocaleTimeString();
+  if (!_balVisible) _applyBalVis();  // re-mask after data refresh
 
   // Stats
   document.getElementById('s-wins').textContent   = d.stats.wins;
@@ -2428,9 +2445,11 @@ function render() {
   document.getElementById('tog-auto').checked    = d.auto_execute;
   if (!document.getElementById('inp-eq').value)    document.getElementById('inp-eq').value    = (d.equity_fraction*100).toFixed(0);
   if (!document.getElementById('inp-lev').value)   document.getElementById('inp-lev').value   = d.default_leverage;
-  if (!document.getElementById('inp-risk').value)  document.getElementById('inp-risk').value  = ((d.risk_pct||0.02)*100).toFixed(1);
-  if (!document.getElementById('inp-sl').value)    document.getElementById('inp-sl').value    = ((d.auto_sl_pct||0.03)*100).toFixed(0);
-  if (!document.getElementById('inp-score').value) document.getElementById('inp-score').value = d.min_ai_score ?? 60;
+  document.getElementById('inp-risk').value  = ((d.risk_pct||0.02)*100).toFixed(1);
+  document.getElementById('inp-sl').value    = ((d.auto_sl_pct||0.03)*100).toFixed(0);
+  document.getElementById('inp-score').value = d.min_ai_score ?? 60;
+  const _prevEl = document.getElementById('settings-risk-preview');
+  if (_prevEl) _prevEl.textContent = ((d.risk_pct||0.02)*100).toFixed(1) + '% risk';
 
   // Accounts page — primary
   document.getElementById('pa-equity').textContent = acc.equity.toFixed(2);
@@ -2833,7 +2852,46 @@ function toggleScoreGuide() {
   btn.textContent    = shown ? 'Show ▾' : 'Hide ▴';
   localStorage.setItem('score_guide', shown ? '0' : '1');
 }
+/* ── Balance visibility toggle ───────────────────────── */
+let _balVisible = localStorage.getItem('balVis') !== '0';
+
+function toggleBalVis() {
+  _balVisible = !_balVisible;
+  localStorage.setItem('balVis', _balVisible ? '1' : '0');
+  _applyBalVis();
+}
+
+function _applyBalVis() {
+  const ids  = ['b-equity','b-avail','b-margin','b-upnl','b-pertrade','b-lev'];
+  const mask = '••••••';
+  const lbl  = document.getElementById('bal-vis-lbl');
+  const icon = document.getElementById('bal-vis-icon');
+  if (!lbl) return;
+  if (_balVisible) {
+    lbl.textContent = 'Hide';
+    icon.innerHTML  = `<path stroke-linecap="round" stroke-linejoin="round"
+      d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (el && el.dataset.real) { el.textContent = el.dataset.real; delete el.dataset.real; }
+    });
+  } else {
+    lbl.textContent = 'Show';
+    icon.innerHTML  = `<path stroke-linecap="round" stroke-linejoin="round"
+      d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+      <path stroke-linecap="round" stroke-linejoin="round"
+        d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+      <line x1="1" y1="1" x2="23" y2="23" stroke-linecap="round"/>`;
+    ids.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) { el.dataset.real = el.textContent; el.textContent = mask; }
+    });
+  }
+}
+
 function _restorePanels() {
+  _applyBalVis();
   if (localStorage.getItem('mkt_panel') === '1') {
     document.getElementById('market-panel').style.display = 'grid';
     document.getElementById('mkt-toggle-btn').textContent = 'Hide ▴';
@@ -3764,6 +3822,69 @@ function adTogglePropMode(el) {
   try { localStorage.setItem('adPropCfg', JSON.stringify(_adPropCfg)); } catch(_) {}
 }
 
+/* ── Risk Strategy Detail Sheet ──────────────────────── */
+function openRiskDetail() {
+  const risk  = parseFloat(document.getElementById('inp-risk').value)  || 2;
+  const sl    = parseFloat(document.getElementById('inp-sl').value)    || 3;
+  const score = parseInt(document.getElementById('inp-score').value)   || 60;
+  const p2    = DATA ? (DATA.phase_2_equity || 750)  : 750;
+  const p3    = DATA ? (DATA.phase_3_equity || 1500) : 1500;
+
+  // Top stats
+  document.getElementById('rd-risk').textContent  = risk + '%';
+  document.getElementById('rd-sl').textContent    = sl + '%';
+  document.getElementById('rd-score').textContent = score || 'Off';
+
+  // Prefill edit inputs
+  document.getElementById('rd-inp-risk').value  = risk;
+  document.getElementById('rd-inp-sl').value    = sl;
+  document.getElementById('rd-inp-score').value = score;
+
+  // Phase thresholds
+  document.getElementById('rd-p2thresh').textContent  = '$' + p2;
+  document.getElementById('rd-p2thresh2').textContent = '$' + p2;
+  document.getElementById('rd-p3thresh').textContent  = '$' + p3;
+  document.getElementById('rd-p3thresh2').textContent = '$' + p3;
+
+  // Phase risk values
+  document.getElementById('rd-p1risk').textContent = risk + '%';
+  document.getElementById('rd-p2risk').textContent = (risk * 1.5).toFixed(1) + '%';
+  document.getElementById('rd-p3risk').textContent = (risk * 2.5).toFixed(1) + '%';
+
+  // Active phase
+  const equity = DATA ? (DATA.account?.equity || 0) : 0;
+  const phase  = equity >= p3 ? 3 : equity >= p2 ? 2 : 1;
+  ['1','2','3'].forEach(p => {
+    const dot = document.getElementById('rd-p' + p + '-active');
+    if (dot) dot.style.display = p == phase ? 'block' : 'none';
+  });
+  const phaseColors = {1:'var(--cyan)', 2:'var(--accent)', 3:'var(--green)'};
+  const badge = document.getElementById('risk-phase-badge');
+  badge.textContent  = 'Phase ' + phase;
+  badge.style.color  = phaseColors[phase];
+
+  document.getElementById('risk-overlay').classList.add('open');
+}
+
+function closeRiskDetail() {
+  document.getElementById('risk-overlay').classList.remove('open');
+}
+
+async function rdApply() {
+  const risk  = document.getElementById('rd-inp-risk').value;
+  const sl    = document.getElementById('rd-inp-sl').value;
+  const score = document.getElementById('rd-inp-score').value;
+  // Sync hidden inputs then call applySettings
+  document.getElementById('inp-risk').value  = risk;
+  document.getElementById('inp-sl').value    = sl;
+  document.getElementById('inp-score').value = score;
+  await applySettings();
+  // Update preview label
+  if (risk) document.getElementById('settings-risk-preview').textContent = risk + '% risk';
+  closeRiskDetail();
+  toast('Risk settings saved', true);
+}
+
 function adSavePropSettings() {
   const id = _adAccountId;
   _adPropCfg[id] = {
@@ -3928,6 +4049,115 @@ setInterval(fetchPositions, 15000);
 setInterval(loadTicker, 60000);
 setInterval(loadMomentumAlerts, 300000);
 </script>
+
+<!-- ── Risk Strategy Detail Sheet ── -->
+<div class="sa-overlay" id="risk-overlay" onclick="if(event.target===this)closeRiskDetail()">
+  <div class="sa-sheet" style="max-height:94dvh">
+    <div class="cs-handle"></div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div>
+        <div style="font-size:20px;font-weight:900">Risk Strategy</div>
+        <div style="font-size:11px;color:var(--text3);margin-top:2px">Monte Carlo position sizing</div>
+      </div>
+      <div id="risk-phase-badge" style="padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;
+        background:var(--accentbg);color:var(--accent);border:1px solid var(--accentbrd)">Phase 1</div>
+    </div>
+
+    <!-- Live settings display -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px">
+      <div class="sa-meta-box" style="text-align:center">
+        <div class="sa-meta-lbl">Risk / Trade</div>
+        <div class="sa-meta-val" id="rd-risk" style="color:var(--accent)">2%</div>
+      </div>
+      <div class="sa-meta-box" style="text-align:center">
+        <div class="sa-meta-lbl">Auto SL</div>
+        <div class="sa-meta-val" id="rd-sl" style="color:var(--red)">3%</div>
+      </div>
+      <div class="sa-meta-box" style="text-align:center">
+        <div class="sa-meta-lbl">Score Gate</div>
+        <div class="sa-meta-val" id="rd-score" style="color:var(--green)">60</div>
+      </div>
+    </div>
+
+    <!-- How it works -->
+    <div style="background:var(--card2);border:1px solid var(--border);border-radius:14px;
+      padding:14px;margin-bottom:14px">
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
+        color:var(--text3);margin-bottom:10px">How Sizing Works</div>
+      <div style="font-size:12.5px;color:var(--text2);line-height:1.7">
+        Position size is back-calculated from your <strong style="color:var(--text)">risk %</strong>
+        and the actual SL distance — not from a fixed equity fraction.<br><br>
+        <span style="color:var(--accent);font-weight:700">Formula:</span><br>
+        <code style="background:var(--card);border:1px solid var(--border);border-radius:6px;
+          padding:4px 8px;font-size:11px;display:block;margin:6px 0;color:var(--text)">
+          notional = (equity × risk%) ÷ SL_distance
+        </code>
+        If your SL is 3% from entry and risk is 2%, and equity is $500:<br>
+        <span style="color:var(--green);font-weight:700">$500 × 2% ÷ 3% = $333 notional</span>
+        — a SL hit costs exactly $10 (2% of $500).
+      </div>
+    </div>
+
+    <!-- Phase thresholds -->
+    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
+      color:var(--text3);margin-bottom:8px">Risk Phases</div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
+      <div id="rd-phase1" class="sa-meta-box" style="display:flex;align-items:center;gap:10px;padding:12px">
+        <div style="width:34px;height:34px;border-radius:10px;background:rgba(90,200,250,.15);
+          display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px">1</div>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:800">Phase 1 — Seed</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px">$0 → <span id="rd-p2thresh">$750</span> · Risk: <span id="rd-p1risk" style="color:var(--cyan);font-weight:700">2%</span></div>
+        </div>
+        <div id="rd-p1-active" style="display:none;width:8px;height:8px;border-radius:50%;background:var(--cyan)"></div>
+      </div>
+      <div id="rd-phase2" class="sa-meta-box" style="display:flex;align-items:center;gap:10px;padding:12px">
+        <div style="width:34px;height:34px;border-radius:10px;background:rgba(0,122,255,.15);
+          display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px">2</div>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:800">Phase 2 — Growth</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px"><span id="rd-p2thresh2">$750</span> → <span id="rd-p3thresh">$1500</span> · Risk: <span id="rd-p2risk" style="color:var(--accent);font-weight:700">3%</span></div>
+        </div>
+        <div id="rd-p2-active" style="display:none;width:8px;height:8px;border-radius:50%;background:var(--accent)"></div>
+      </div>
+      <div id="rd-phase3" class="sa-meta-box" style="display:flex;align-items:center;gap:10px;padding:12px">
+        <div style="width:34px;height:34px;border-radius:10px;background:rgba(52,199,89,.15);
+          display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px">3</div>
+        <div style="flex:1">
+          <div style="font-size:12px;font-weight:800">Phase 3 — Scale</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:2px"><span id="rd-p3thresh2">$1500</span>+ · Risk: <span id="rd-p3risk" style="color:var(--green);font-weight:700">5%</span></div>
+        </div>
+        <div id="rd-p3-active" style="display:none;width:8px;height:8px;border-radius:50%;background:var(--green)"></div>
+      </div>
+    </div>
+
+    <!-- Edit settings inline -->
+    <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
+      color:var(--text3);margin-bottom:8px">Adjust Settings</div>
+    <div class="inp-grid mb">
+      <div class="inp-wrap">
+        <label class="inp-lbl">Risk % / trade</label>
+        <input class="inp" type="number" id="rd-inp-risk" min="0.5" max="10" step="0.5" placeholder="2">
+      </div>
+      <div class="inp-wrap">
+        <label class="inp-lbl">Auto-SL %</label>
+        <input class="inp" type="number" id="rd-inp-sl" min="1" max="10" step="0.5" placeholder="3">
+      </div>
+    </div>
+    <div class="inp-wrap mb">
+      <label class="inp-lbl">AI Score Gate (0 = off)</label>
+      <input class="inp" type="number" id="rd-inp-score" min="0" max="100" placeholder="60">
+    </div>
+    <div class="btn-grid">
+      <button class="btn btn-primary" onclick="rdApply()">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;stroke-width:2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+        Apply
+      </button>
+      <button class="btn btn-ghost" onclick="closeRiskDetail()">Cancel</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── Signal Analysis Full-Screen Overlay ── -->
 <div class="sa-overlay" id="sa-overlay" onclick="if(event.target===this)closeSigAnalysis()">
