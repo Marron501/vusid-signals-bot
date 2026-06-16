@@ -856,8 +856,9 @@ button,input,select{font-family:inherit}
   position:sticky;top:0;z-index:60;transition:background .3s,border-color .3s;
   overflow:hidden;box-shadow:0 1px 0 var(--border),0 2px 12px var(--shadow)}
 .brand-name{font-size:22px;font-weight:900;letter-spacing:-.5px;
-  background:linear-gradient(135deg,#007AFF,#5E5CE6);
-  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  background:linear-gradient(180deg,#FFE566 0%,#FFAB00 45%,#E06800 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  filter:drop-shadow(0 1px 0 rgba(100,42,0,.95)) drop-shadow(0 3px 8px rgba(0,0,0,.3))}
 .brand-sub{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--text3)}
 .top-right{display:flex;align-items:center;gap:8px}
 .icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);
@@ -1411,21 +1412,48 @@ select.inp option{background:var(--card);color:var(--text)}
 <!-- TOP BAR -->
 <div class="topbar">
   <div style="display:flex;align-items:center;gap:10px">
-    <!-- Prolific logo mark -->
-    <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="36" height="36" rx="9" fill="url(#logoGrad)"/>
+    <!-- Prolific 3D logo mark -->
+    <svg width="42" height="42" viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="logoGrad" x1="0" y1="0" x2="36" y2="36" gradientUnits="userSpaceOnUse">
-          <stop stop-color="#FF6B35"/>
-          <stop offset="1" stop-color="#C2410C"/>
+        <linearGradient id="lg-face" x1="0" y1="0" x2="0.6" y2="1" gradientUnits="objectBoundingBox">
+          <stop offset="0%"   stop-color="#FFE566"/>
+          <stop offset="45%"  stop-color="#FFAB00"/>
+          <stop offset="100%" stop-color="#E06800"/>
         </linearGradient>
+        <linearGradient id="lg-right" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
+          <stop offset="0%"   stop-color="#B36200"/>
+          <stop offset="100%" stop-color="#4A2A00"/>
+        </linearGradient>
+        <linearGradient id="lg-bot" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
+          <stop offset="0%"   stop-color="#7A4400"/>
+          <stop offset="100%" stop-color="#3D1E00"/>
+        </linearGradient>
+        <radialGradient id="lg-shine" cx="30%" cy="28%" r="55%">
+          <stop offset="0%"   stop-color="rgba(255,255,230,0.65)"/>
+          <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
+        </radialGradient>
+        <filter id="lg-shad" x="-25%" y="-25%" width="170%" height="170%">
+          <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#000" flood-opacity="0.42"/>
+        </filter>
       </defs>
+      <!-- 3D right face -->
+      <path d="M32 5 L39 10 L39 35 L32 30 Z" fill="url(#lg-right)"/>
+      <!-- 3D bottom face -->
+      <path d="M5 32 L32 32 L39 37 L12 37 Z" fill="url(#lg-bot)"/>
+      <!-- Main front face -->
+      <rect x="3" y="3" width="29" height="29" rx="8" fill="url(#lg-face)" filter="url(#lg-shad)"/>
+      <!-- Top-edge highlight -->
+      <rect x="3" y="3" width="29" height="4" rx="4" fill="rgba(255,255,210,0.55)"/>
+      <!-- Left-edge highlight -->
+      <rect x="3" y="3" width="4" height="29" rx="4" fill="rgba(255,255,210,0.35)"/>
+      <!-- Glass shine spot -->
+      <ellipse cx="13" cy="12" rx="9" ry="5.5" fill="url(#lg-shine)"/>
       <!-- P letterform -->
-      <path d="M11 9h8a5 5 0 0 1 0 10h-4v8H11V9z" fill="white"/>
-      <path d="M15 12h3.5a1.5 1.5 0 0 1 0 3H15v-3z" fill="#FF6B35"/>
-      <!-- Upward trend line on right side -->
-      <polyline points="23,25 25,21 27,23 29,18" stroke="white" stroke-width="1.6"
-        stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+      <path d="M8 10h9a5.5 5.5 0 0 1 0 11h-4.5v7H8V10z" fill="white" opacity="0.95"/>
+      <!-- Trend arrow (right area) -->
+      <polyline points="20,25 22,20 24,23 28,14" stroke="white" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
+      <polygon points="30,12 26,13 28,16" fill="white" opacity="0.9"/>
     </svg>
     <div>
       <div class="brand-name">Prolific</div>
@@ -3870,6 +3898,125 @@ function closeRiskDetail() {
   document.getElementById('risk-overlay').classList.remove('open');
 }
 
+/* ── Phase Detail Sheet ───────────────────────────────── */
+function openPhaseDetail(n) {
+  const risk  = parseFloat(document.getElementById('inp-risk').value)  || 2;
+  const sl    = parseFloat(document.getElementById('inp-sl').value)    || 3;
+  const p2    = DATA ? (DATA.phase_2_equity || 750)  : 750;
+  const p3    = DATA ? (DATA.phase_3_equity || 1500) : 1500;
+  const eq    = DATA ? (DATA.account?.equity || 0) : 0;
+
+  const phases = {
+    1: {
+      title:'Seed', subtitle:'Build your base — survive and grow.',
+      color:'linear-gradient(135deg,#0A84FF,#0055CC)',
+      multLabel:'1×', mult:1.0,
+      rangeStart:0, rangeEnd:p2,
+      color_hex:'#5AC8FA',
+      rules:[
+        {icon:'🎯', text:'Only take AI scores ≥ 60. Be selective — one bad trade is harder to recover from at small size.'},
+        {icon:'📏', text:'Every position risks exactly ' + risk + '% of your account. Never override sizing.'},
+        {icon:'🛡️', text:'If no SL is in the signal, the bot sets auto-SL at ' + sl + '% from entry. Never trade without a stop.'},
+        {icon:'🔄', text:'Aim for 2:1 R:R minimum. Pass on anything below 1.5:1.'},
+        {icon:'📵', text:'No revenge trading. If you hit 3 losses in a day, stop and review.'},
+        {icon:'🏁', text:'Goal: reach $' + p2 + ' consistently. Once you cross it you unlock Phase 2 risk.'},
+      ]
+    },
+    2: {
+      title:'Growth', subtitle:'Compound aggressively but stay disciplined.',
+      color:'linear-gradient(135deg,#007AFF,#5E5CE6)',
+      multLabel:'1.5×', mult:1.5,
+      rangeStart:p2, rangeEnd:p3,
+      color_hex:'#007AFF',
+      rules:[
+        {icon:'📈', text:'Risk increases to ' + (risk*1.5).toFixed(1) + '% per trade — 1.5× base. Position sizes are now noticeably larger.'},
+        {icon:'🎯', text:'Raise your score gate to 65+. More capital on the line means you can afford to be pickier.'},
+        {icon:'⚡', text:'Start taking 2–3 signals per day instead of 1. The bot handles sizing automatically.'},
+        {icon:'🧠', text:'Watch the momentum alerts. At this phase a reversal can cost real money, act on close_now alerts.'},
+        {icon:'🔒', text:'Hard rule: never lose more than 6% in a single day. If you do, stop trading for 24 hours.'},
+        {icon:'🏁', text:'Goal: reach $' + p3 + ' and stay above it for 5+ consecutive days before Phase 3.'},
+      ]
+    },
+    3: {
+      title:'Scale', subtitle:'Maximum compounding — protect what you\'ve built.',
+      color:'linear-gradient(135deg,#34C759,#30A048)',
+      multLabel:'2.5×', mult:2.5,
+      rangeStart:p3, rangeEnd:null,
+      color_hex:'#34C759',
+      rules:[
+        {icon:'💰', text:'Risk is ' + (risk*2.5).toFixed(1) + '% per trade — 2.5× base. Each trade now moves real money. Size is earned, not assumed.'},
+        {icon:'🎯', text:'Minimum AI score gate: 70. You are trading at full power — only elite setups.'},
+        {icon:'🛡️', text:'Drawdown protection: if equity drops 10% below its Phase 3 peak, cut risk back to Phase 2 levels until recovered.'},
+        {icon:'🔁', text:'Diversify: spread signals across different assets. Avoid 3+ open positions in correlated coins.'},
+        {icon:'📊', text:'Weekly review: check win rate, average R:R, and total PnL. Adjust score gate if win rate drops below 55%.'},
+        {icon:'🏆', text:'This is the compounding phase. Let the bot work. Do not manually interfere with positions.'},
+      ]
+    }
+  };
+
+  const ph    = phases[n];
+  const effRisk = risk * ph.mult;
+  const riskAmt = eq * effRisk / 100;
+  const slDist  = sl / 100;
+  const notional= slDist > 0 ? riskAmt / slDist : 0;
+  const margin  = notional / 5;
+  const currPhase = eq >= p3 ? 3 : eq >= p2 ? 2 : 1;
+
+  // Banner
+  document.getElementById('pd-banner').style.background = ph.color;
+  document.getElementById('pd-phase-num').textContent = 'Phase ' + n;
+  document.getElementById('pd-title').textContent = ph.title;
+  document.getElementById('pd-subtitle').textContent = ph.subtitle;
+  document.getElementById('pd-active-pill').style.display = currPhase === n ? 'block' : 'none';
+
+  // Progress bar
+  const rangeStart = ph.rangeStart;
+  const rangeEnd   = ph.rangeEnd;
+  let pct = 0, posLabel = '';
+  if (rangeEnd) {
+    pct = Math.min(100, Math.max(0, (eq - rangeStart) / (rangeEnd - rangeStart) * 100));
+    posLabel = eq > rangeStart
+      ? `$${eq.toFixed(0)} — ${pct.toFixed(0)}% through Phase ${n}`
+      : `Need $${(rangeStart - eq).toFixed(0)} more to enter Phase ${n}`;
+  } else {
+    pct = eq >= rangeStart ? 100 : 0;
+    posLabel = eq >= rangeStart ? `✓ Phase ${n} unlocked` : `Need $${(rangeStart-eq).toFixed(0)} more`;
+  }
+  document.getElementById('pd-range-start').textContent = '$' + rangeStart;
+  document.getElementById('pd-range-end').textContent   = rangeEnd ? '$' + rangeEnd : '∞';
+  document.getElementById('pd-range-label').textContent = 'Phase ' + n + ' Range';
+  document.getElementById('pd-progress-bar').style.width      = pct + '%';
+  document.getElementById('pd-progress-bar').style.background = ph.color_hex;
+  document.getElementById('pd-equity-pos').textContent = posLabel;
+
+  // Stats
+  document.getElementById('pd-risk').textContent   = effRisk.toFixed(1) + '%';
+  document.getElementById('pd-risk').style.color   = ph.color_hex;
+  document.getElementById('pd-mult').textContent   = ph.multLabel;
+  document.getElementById('pd-dollar').textContent = eq > 0 ? '$' + riskAmt.toFixed(1) : '—';
+
+  // Example
+  document.getElementById('pd-ex-equity').textContent   = '$' + eq.toFixed(2);
+  document.getElementById('pd-ex-risk-amt').textContent = '$' + riskAmt.toFixed(2);
+  document.getElementById('pd-ex-sl').textContent       = sl + '%';
+  document.getElementById('pd-ex-notional').textContent = '$' + notional.toFixed(2);
+  document.getElementById('pd-ex-margin').textContent   = '$' + margin.toFixed(2);
+
+  // Rules
+  document.getElementById('pd-rules').innerHTML = ph.rules.map(r => `
+    <div style="display:flex;align-items:flex-start;gap:10px;background:var(--card2);
+      border:1px solid var(--border);border-radius:10px;padding:10px 12px">
+      <span style="font-size:16px;flex-shrink:0;line-height:1.4">${r.icon}</span>
+      <span style="font-size:12px;color:var(--text2);line-height:1.6">${r.text}</span>
+    </div>`).join('');
+
+  document.getElementById('phase-overlay').classList.add('open');
+}
+
+function closePhaseDetail() {
+  document.getElementById('phase-overlay').classList.remove('open');
+}
+
 async function rdApply() {
   const risk  = document.getElementById('rd-inp-risk').value;
   const sl    = document.getElementById('rd-inp-sl').value;
@@ -4103,32 +4250,71 @@ setInterval(loadMomentumAlerts, 300000);
     <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
       color:var(--text3);margin-bottom:8px">Risk Phases</div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">
-      <div id="rd-phase1" class="sa-meta-box" style="display:flex;align-items:center;gap:10px;padding:12px">
-        <div style="width:34px;height:34px;border-radius:10px;background:rgba(90,200,250,.15);
-          display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px">1</div>
+      <!-- Phase 1 -->
+      <div id="rd-phase1" onclick="openPhaseDetail(1)"
+        class="sa-meta-box" style="display:flex;align-items:center;gap:10px;padding:14px;
+        cursor:pointer;transition:all .15s;border:1px solid rgba(90,200,250,.2)">
+        <div style="width:38px;height:38px;border-radius:12px;
+          background:linear-gradient(135deg,rgba(90,200,250,.25),rgba(90,200,250,.1));
+          display:flex;align-items:center;justify-content:center;flex-shrink:0;
+          font-size:18px;font-weight:900;color:#5AC8FA">1</div>
         <div style="flex:1">
-          <div style="font-size:12px;font-weight:800">Phase 1 — Seed</div>
-          <div style="font-size:10px;color:var(--text3);margin-top:2px">$0 → <span id="rd-p2thresh">$750</span> · Risk: <span id="rd-p1risk" style="color:var(--cyan);font-weight:700">2%</span></div>
+          <div style="font-size:13px;font-weight:800">Phase 1 — Seed</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:3px">
+            $0 → <span id="rd-p2thresh">$750</span>
+            &nbsp;·&nbsp; Risk: <span id="rd-p1risk" style="color:#5AC8FA;font-weight:700">2%</span>
+          </div>
         </div>
-        <div id="rd-p1-active" style="display:none;width:8px;height:8px;border-radius:50%;background:var(--cyan)"></div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div id="rd-p1-active" style="display:none;width:8px;height:8px;border-radius:50%;background:#5AC8FA"></div>
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="var(--text3)" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
       </div>
-      <div id="rd-phase2" class="sa-meta-box" style="display:flex;align-items:center;gap:10px;padding:12px">
-        <div style="width:34px;height:34px;border-radius:10px;background:rgba(0,122,255,.15);
-          display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px">2</div>
+      <!-- Phase 2 -->
+      <div id="rd-phase2" onclick="openPhaseDetail(2)"
+        class="sa-meta-box" style="display:flex;align-items:center;gap:10px;padding:14px;
+        cursor:pointer;transition:all .15s;border:1px solid rgba(0,122,255,.2)">
+        <div style="width:38px;height:38px;border-radius:12px;
+          background:linear-gradient(135deg,rgba(0,122,255,.25),rgba(0,122,255,.1));
+          display:flex;align-items:center;justify-content:center;flex-shrink:0;
+          font-size:18px;font-weight:900;color:#007AFF">2</div>
         <div style="flex:1">
-          <div style="font-size:12px;font-weight:800">Phase 2 — Growth</div>
-          <div style="font-size:10px;color:var(--text3);margin-top:2px"><span id="rd-p2thresh2">$750</span> → <span id="rd-p3thresh">$1500</span> · Risk: <span id="rd-p2risk" style="color:var(--accent);font-weight:700">3%</span></div>
+          <div style="font-size:13px;font-weight:800">Phase 2 — Growth</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:3px">
+            <span id="rd-p2thresh2">$750</span> → <span id="rd-p3thresh">$1500</span>
+            &nbsp;·&nbsp; Risk: <span id="rd-p2risk" style="color:#007AFF;font-weight:700">3%</span>
+          </div>
         </div>
-        <div id="rd-p2-active" style="display:none;width:8px;height:8px;border-radius:50%;background:var(--accent)"></div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div id="rd-p2-active" style="display:none;width:8px;height:8px;border-radius:50%;background:#007AFF"></div>
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="var(--text3)" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
       </div>
-      <div id="rd-phase3" class="sa-meta-box" style="display:flex;align-items:center;gap:10px;padding:12px">
-        <div style="width:34px;height:34px;border-radius:10px;background:rgba(52,199,89,.15);
-          display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px">3</div>
+      <!-- Phase 3 -->
+      <div id="rd-phase3" onclick="openPhaseDetail(3)"
+        class="sa-meta-box" style="display:flex;align-items:center;gap:10px;padding:14px;
+        cursor:pointer;transition:all .15s;border:1px solid rgba(52,199,89,.2)">
+        <div style="width:38px;height:38px;border-radius:12px;
+          background:linear-gradient(135deg,rgba(52,199,89,.25),rgba(52,199,89,.1));
+          display:flex;align-items:center;justify-content:center;flex-shrink:0;
+          font-size:18px;font-weight:900;color:#34C759">3</div>
         <div style="flex:1">
-          <div style="font-size:12px;font-weight:800">Phase 3 — Scale</div>
-          <div style="font-size:10px;color:var(--text3);margin-top:2px"><span id="rd-p3thresh2">$1500</span>+ · Risk: <span id="rd-p3risk" style="color:var(--green);font-weight:700">5%</span></div>
+          <div style="font-size:13px;font-weight:800">Phase 3 — Scale</div>
+          <div style="font-size:10px;color:var(--text3);margin-top:3px">
+            <span id="rd-p3thresh2">$1500</span>+
+            &nbsp;·&nbsp; Risk: <span id="rd-p3risk" style="color:#34C759;font-weight:700">5%</span>
+          </div>
         </div>
-        <div id="rd-p3-active" style="display:none;width:8px;height:8px;border-radius:50%;background:var(--green)"></div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div id="rd-p3-active" style="display:none;width:8px;height:8px;border-radius:50%;background:#34C759"></div>
+          <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="var(--text3)" stroke-width="2.5">
+            <polyline points="9 18 15 12 9 6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
       </div>
     </div>
 
@@ -4156,6 +4342,97 @@ setInterval(loadMomentumAlerts, 300000);
       </button>
       <button class="btn btn-ghost" onclick="closeRiskDetail()">Cancel</button>
     </div>
+  </div>
+</div>
+
+<!-- ── Phase Detail Sheet ── -->
+<div class="sa-overlay" id="phase-overlay" onclick="if(event.target===this)closePhaseDetail()">
+  <div class="sa-sheet" style="max-height:94dvh">
+    <div class="cs-handle"></div>
+    <!-- Coloured header banner -->
+    <div id="pd-banner" style="border-radius:16px;padding:18px;margin-bottom:16px;position:relative;overflow:hidden">
+      <div style="position:absolute;top:-30px;right:-30px;width:120px;height:120px;
+        border-radius:50%;background:rgba(255,255,255,0.08)"></div>
+      <div style="font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:1px;
+        opacity:.75;margin-bottom:4px" id="pd-phase-num">Phase 1</div>
+      <div style="font-size:26px;font-weight:900;color:#fff;letter-spacing:-.5px" id="pd-title">Seed</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.75);margin-top:4px" id="pd-subtitle">Building your base</div>
+      <!-- Active indicator -->
+      <div id="pd-active-pill" style="display:none;position:absolute;top:14px;right:14px;
+        background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.3);
+        border-radius:20px;padding:4px 10px;font-size:9px;font-weight:800;color:#fff">
+        CURRENT PHASE
+      </div>
+    </div>
+
+    <!-- Equity range progress -->
+    <div class="sa-meta-box" style="margin-bottom:12px;padding:14px">
+      <div style="display:flex;justify-content:space-between;font-size:10px;font-weight:700;
+        color:var(--text3);margin-bottom:8px">
+        <span id="pd-range-start">$0</span>
+        <span id="pd-range-label">Equity Range</span>
+        <span id="pd-range-end">$750</span>
+      </div>
+      <div style="height:8px;background:var(--border);border-radius:4px;overflow:hidden">
+        <div id="pd-progress-bar" style="height:100%;border-radius:4px;transition:width .6s cubic-bezier(.4,0,.2,1)"></div>
+      </div>
+      <div style="text-align:center;margin-top:6px;font-size:11px;color:var(--text3)">
+        <span id="pd-equity-pos"></span>
+      </div>
+    </div>
+
+    <!-- Stats grid -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+      <div class="sa-meta-box" style="text-align:center;padding:12px">
+        <div class="sa-meta-lbl">Effective Risk</div>
+        <div class="sa-meta-val" id="pd-risk" style="font-size:20px">—</div>
+      </div>
+      <div class="sa-meta-box" style="text-align:center;padding:12px">
+        <div class="sa-meta-lbl">Risk Multiplier</div>
+        <div class="sa-meta-val" id="pd-mult" style="font-size:20px">—</div>
+      </div>
+      <div class="sa-meta-box" style="text-align:center;padding:12px">
+        <div class="sa-meta-lbl">$ at Risk / trade</div>
+        <div class="sa-meta-val" id="pd-dollar" style="font-size:20px">—</div>
+      </div>
+    </div>
+
+    <!-- Example trade -->
+    <div id="pd-example" style="background:var(--card2);border:1px solid var(--border);
+      border-radius:14px;padding:14px;margin-bottom:12px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
+        color:var(--text3);margin-bottom:10px">Example Trade (Your Equity)</div>
+      <div style="display:flex;flex-direction:column;gap:7px;font-size:12px">
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--text3)">Account equity</span>
+          <span id="pd-ex-equity" style="font-weight:800">$0</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--text3)">Risk amount</span>
+          <span id="pd-ex-risk-amt" style="font-weight:800;color:var(--red)">$0</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--text3)">Auto-SL distance</span>
+          <span id="pd-ex-sl" style="font-weight:800">3%</span>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:7px;
+          display:flex;justify-content:space-between">
+          <span style="color:var(--text3)">Position notional</span>
+          <span id="pd-ex-notional" style="font-weight:900;color:var(--accent);font-size:14px">$0</span>
+        </div>
+        <div style="display:flex;justify-content:space-between">
+          <span style="color:var(--text3)">Margin used (5× lev)</span>
+          <span id="pd-ex-margin" style="font-weight:800">$0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rules & strategy -->
+    <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
+      color:var(--text3);margin-bottom:8px">Strategy & Rules</div>
+    <div id="pd-rules" style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px"></div>
+
+    <button class="btn btn-ghost btn-sm" onclick="closePhaseDetail()" style="width:100%">Close</button>
   </div>
 </div>
 
