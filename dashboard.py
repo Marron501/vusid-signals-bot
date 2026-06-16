@@ -1421,6 +1421,7 @@ select.inp option{background:var(--card);color:var(--text)}
   background:linear-gradient(105deg,transparent 40%,rgba(255,107,53,.04) 50%,transparent 60%);
   background-size:200% 100%;animation:shimmer 6s ease-in-out infinite}
 @keyframes shimmer{0%,100%{background-position:200% 0}50%{background-position:-200% 0}}
+@keyframes fng-spin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -1640,7 +1641,17 @@ select.inp option{background:var(--card);color:var(--text)}
   <div class="card" id="fng-card" style="margin-bottom:12px;padding:14px 16px">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--text3)">CRYPTO FEAR &amp; GREED</div>
-      <div style="font-size:9px;color:var(--text3)" id="fng-updated">Updating…</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div style="font-size:9px;color:var(--text3)" id="fng-updated">Updating…</div>
+        <button onclick="fngRefresh(this)" style="background:none;border:none;padding:2px;cursor:pointer;
+          color:var(--text3);display:flex;align-items:center;line-height:1" title="Refresh">
+          <svg id="fng-refresh-icon" width="12" height="12" viewBox="0 0 24 24" fill="none"
+            stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="23 4 23 10 17 10"/>
+            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+          </svg>
+        </button>
+      </div>
     </div>
     <div style="display:flex;align-items:center;gap:16px">
       <!-- Dial -->
@@ -4254,50 +4265,61 @@ function tick() {
 }
 
 /* ── Fear & Greed Index ───────────────────────────────── */
+async function fngRefresh(btn) {
+  const icon = document.getElementById('fng-refresh-icon');
+  if (icon) icon.style.animation = 'fng-spin .7s linear infinite';
+  if (btn)  btn.disabled = true;
+  // bypass client cache — add ts param so server still caches on its side
+  try {
+    const r = await fetch('/api/fear-greed?r=' + Date.now());
+    if (r.ok) {
+      const d = await r.json();
+      _applyFng(d);
+    }
+  } catch(e) {}
+  if (icon) icon.style.animation = '';
+  if (btn)  btn.disabled = false;
+}
+
+function _applyFng(d) {
+  if (!d || d.value == null) return;
+  const v   = d.value;
+  const lbl = d.classification;
+  const col = v <= 24 ? '#FF3B30'
+            : v <= 49 ? '#FF9500'
+            : v <= 54 ? '#FFD60A'
+            : v <= 74 ? '#34C759'
+            :            '#00C7BE';
+
+  const arcLen = 113.1;
+  const arc = document.getElementById('fng-arc');
+  if (arc) { arc.style.strokeDashoffset = arcLen - (v/100)*arcLen; arc.style.stroke = col; }
+
+  const needle = document.getElementById('fng-needle');
+  if (needle) needle.style.transform = `rotate(${-90 + (v/100)*180}deg)`;
+
+  const marker = document.getElementById('fng-marker');
+  if (marker) marker.style.left = v + '%';
+
+  const valEl = document.getElementById('fng-val');
+  if (valEl) { valEl.textContent = v; valEl.style.color = col; }
+
+  const lblEl = document.getElementById('fng-label');
+  if (lblEl) { lblEl.textContent = lbl; lblEl.style.color = col; }
+
+  const upEl = document.getElementById('fng-updated');
+  if (upEl && d.updated) {
+    const mins = Math.round((Date.now()/1000 - d.updated) / 60);
+    upEl.textContent = mins < 2 ? 'Just updated' : `${mins}m ago`;
+  }
+}
+
 async function fetchFearGreed() {
   try {
     const r = await fetch('/api/fear-greed');
     if (!r.ok) return;
-    const d = await r.json();
-    if (d.value == null) return;
-
-    const v   = d.value;                   // 0-100
-    const lbl = d.classification;
-
-    // Colour: Ext Fear → red, Fear → orange, Neutral → yellow, Greed → green, Ext Greed → teal
-    const col = v <= 24 ? '#FF3B30'
-              : v <= 49 ? '#FF9500'
-              : v <= 54 ? '#FFD60A'
-              : v <= 74 ? '#34C759'
-              :            '#00C7BE';
-
-    // Arc: semicircle path length = π × r = π × 36 ≈ 113.1
-    const arcLen = 113.1;
-    const offset = arcLen - (v / 100) * arcLen;
-    const arc    = document.getElementById('fng-arc');
-    if (arc) { arc.style.strokeDashoffset = offset; arc.style.stroke = col; }
-
-    // Needle: -90° (left, value=0) → +90° (right, value=100), centred at 0°=top
-    const deg = -90 + (v / 100) * 180;
-    const needle = document.getElementById('fng-needle');
-    if (needle) needle.style.transform = `rotate(${deg}deg)`;
-
-    // Marker on gradient bar
-    const marker = document.getElementById('fng-marker');
-    if (marker) marker.style.left = v + '%';
-
-    const valEl = document.getElementById('fng-val');
-    if (valEl) { valEl.textContent = v; valEl.style.color = col; }
-
-    const lblEl = document.getElementById('fng-label');
-    if (lblEl) { lblEl.textContent = lbl; lblEl.style.color = col; }
-
-    const upEl = document.getElementById('fng-updated');
-    if (upEl && d.updated) {
-      const mins = Math.round((Date.now()/1000 - d.updated) / 60);
-      upEl.textContent = mins < 2 ? 'Just updated' : `${mins}m ago`;
-    }
-  } catch(e) { /* silent fail */ }
+    _applyFng(await r.json());
+  } catch(e) {}
 }
 
 /* ── Boot ────────────────────────────────────────────── */
