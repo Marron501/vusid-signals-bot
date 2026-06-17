@@ -693,6 +693,85 @@ def api_market_ticker():
         return jsonify(_mkt_cache["data"] or {"gainers": [], "losers": []})
 
 
+@app.route("/api/test-signal", methods=["POST"])
+def api_test_signal():
+    """
+    Fire a synthetic signal through the full pipeline on a specific account.
+    Useful for demo/testnet verification without waiting for a Discord signal.
+    """
+    from decimal import Decimal
+    d      = request.get_json() or {}
+    acc_id = d.get("account_id")          # None = primary
+    sym    = d.get("symbol", "BTCUSDT").upper()
+    side   = d.get("side", "Buy")
+    if not sym.endswith("USDT"): sym += "USDT"
+
+    signal = {
+        "action":   "open",
+        "symbol":   sym,
+        "side":     side,
+        "leverage": d.get("leverage", 5),
+        "stop_loss":   d.get("stop_loss"),
+        "take_profit": d.get("take_profit"),
+        "_test":    True,
+    }
+    try:
+        import config as _c
+        if acc_id:
+            from accounts_manager import load_accounts, get_executor
+            accs = load_accounts()
+            acc  = next((a for a in accs if a["id"] == acc_id), None)
+            if not acc: return jsonify({"success": False, "error": "Account not found"})
+            ex  = get_executor(acc)
+            lev = Decimal(str(acc.get("leverage", _c.DEFAULT_LEVERAGE)))
+        else:
+            ex  = _executor()
+            lev = Decimal(str(_c.DEFAULT_LEVERAGE))
+
+        equity = ex.get_equity()
+        eq_f   = float(equity)
+        base   = _c.RISK_PCT
+        if eq_f >= _c.PHASE_3_EQUITY:   risk_pct = base * 2.5; phase = 3
+        elif eq_f >= _c.PHASE_2_EQUITY: risk_pct = base * 1.5; phase = 2
+        else:                            risk_pct = base;        phase = 1
+
+        sl_price = signal.get("stop_loss")
+        if sl_price:
+            mark    = float(ex.get_mark_price(sym))
+            sl_dist = max(abs(mark - float(sl_price)) / mark, 0.005)
+        else:
+            sl_dist = _c.AUTO_SL_PCT
+
+        risk_amt = equity * Decimal(str(risk_pct))
+        cost     = (risk_amt / Decimal(str(sl_dist))) / lev
+
+        if sym not in ex.instruments:
+            return jsonify({"success": False, "error": f"{sym} not tradeable on this account"})
+
+        ok = ex.open_position(sym, side, cost, lev)
+        if ok:
+            if not sl_price and _c.AUTO_SL_PCT > 0:
+                try:
+                    mark    = float(ex.get_mark_price(sym))
+                    auto_sl = mark*(1-_c.AUTO_SL_PCT) if side=="Buy" else mark*(1+_c.AUTO_SL_PCT)
+                    ex.set_trading_stop(sym, side, stop_loss=round(auto_sl, 6))
+                except Exception:
+                    pass
+            return jsonify({
+                "success":  True,
+                "symbol":   sym,
+                "side":     side,
+                "phase":    phase,
+                "risk_pct": round(risk_pct*100, 2),
+                "cost":     round(float(cost), 2),
+                "notional": round(float(risk_amt/Decimal(str(sl_dist))), 2),
+                "equity":   round(eq_f, 2),
+            })
+        return jsonify({"success": False, "error": getattr(ex,"last_open_error","Order failed")})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
 @app.route("/api/risk-guard", methods=["GET"])
 def api_risk_guard_get():
     import risk_guard as _rg
@@ -2051,6 +2130,48 @@ select.inp option{background:var(--card);color:var(--text)}
   </div>
   <div id="acct-ctrl-list">
     <div style="font-size:12px;color:var(--text3);text-align:center;padding:12px">Loading…</div>
+  </div>
+
+  <div class="div"></div>
+  <div class="section-lbl">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+    Test Signal
+  </div>
+  <div class="card mb" style="padding:14px 16px">
+    <div style="font-size:11px;color:var(--text2);margin-bottom:10px;line-height:1.5">
+      Fire a real order through the full strategy pipeline on any account.
+      Uses your configured risk %, phase, and auto-SL — exactly like a live signal.
+    </div>
+    <div class="inp-grid mb">
+      <div class="inp-wrap">
+        <label class="inp-lbl">Account</label>
+        <select class="inp" id="ts-acc">
+          <option value="">Primary</option>
+        </select>
+      </div>
+      <div class="inp-wrap">
+        <label class="inp-lbl">Symbol</label>
+        <input class="inp" id="ts-sym" placeholder="BTC" value="BTC">
+      </div>
+    </div>
+    <div class="inp-grid mb">
+      <div class="inp-wrap">
+        <label class="inp-lbl">Direction</label>
+        <select class="inp" id="ts-side">
+          <option value="Buy">Long ↑</option>
+          <option value="Sell">Short ↓</option>
+        </select>
+      </div>
+      <div class="inp-wrap">
+        <label class="inp-lbl">SL Price (optional)</label>
+        <input class="inp" id="ts-sl" placeholder="auto">
+      </div>
+    </div>
+    <button class="btn btn-green" onclick="sendTestSignal()" style="margin-bottom:6px">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      Fire Test Signal
+    </button>
+    <div id="ts-msg" style="display:none;font-size:11px;padding:8px;border-radius:8px;margin-top:6px"></div>
   </div>
 
   <div class="div"></div>
@@ -3495,6 +3616,7 @@ async function loadAccounts() {
   renderAccList();
   renderHomeAccounts();
   renderAcctControls();
+  _populateTsAccounts();
 }
 function renderAccList() {
   const el = document.getElementById('acc-list');
@@ -4348,6 +4470,62 @@ function tick() {
   const el = document.getElementById('cd');
   if (el) el.textContent = `Auto-refresh in ${countdown}s · ${new Date().toLocaleTimeString()}`;
   if (countdown <= 0) { countdown = 12; fetchData(); }
+}
+
+/* ── Test Signal ─────────────────────────────────────── */
+function _populateTsAccounts() {
+  const sel = document.getElementById('ts-acc');
+  if (!sel || !_accounts) return;
+  while (sel.options.length > 1) sel.remove(1);
+  _accounts.forEach(a => {
+    const opt = document.createElement('option');
+    opt.value = a.id;
+    opt.textContent = a.name + (a.testnet ? ' (Demo)' : '');
+    sel.appendChild(opt);
+  });
+}
+
+async function sendTestSignal() {
+  const accId = document.getElementById('ts-acc').value;
+  const sym   = (document.getElementById('ts-sym').value || 'BTC').trim().toUpperCase();
+  const side  = document.getElementById('ts-side').value;
+  const sl    = document.getElementById('ts-sl').value;
+  const msg   = document.getElementById('ts-msg');
+
+  msg.style.display = 'block';
+  msg.style.background = 'var(--card2)';
+  msg.style.color = 'var(--text2)';
+  msg.textContent = 'Sending test signal…';
+
+  const body = { symbol: sym, side };
+  if (accId) body.account_id = accId;
+  if (sl)    body.stop_loss = parseFloat(sl);
+
+  try {
+    const r = await fetch('/api/test-signal', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (d.success) {
+      msg.style.background = 'rgba(52,199,89,.12)';
+      msg.style.color = 'var(--green)';
+      msg.innerHTML =
+        `✅ ${d.symbol} ${d.side} opened<br>` +
+        `Phase ${d.phase} · Risk ${d.risk_pct}% · ` +
+        `Margin $${d.cost} · Notional $${d.notional}`;
+      toast(`Test signal executed: ${d.symbol}`, true);
+      setTimeout(() => fetchPositions(), 1500);
+    } else {
+      msg.style.background = 'rgba(255,59,48,.12)';
+      msg.style.color = 'var(--red)';
+      msg.textContent = '❌ ' + (d.error || 'Failed');
+    }
+  } catch(e) {
+    msg.style.background = 'rgba(255,59,48,.12)';
+    msg.style.color = 'var(--red)';
+    msg.textContent = '❌ Request failed';
+  }
 }
 
 /* ── Risk Guard ──────────────────────────────────────── */
