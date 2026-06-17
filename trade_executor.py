@@ -59,10 +59,10 @@ class TradeExecutor:
         self.client = HTTP(
             api_key=key,
             api_secret=secret,
-            testnet=False,
-            demo=demo,
+            testnet=demo,   # testnet.bybit.com when True
+            demo=False,
         )
-        mode = "DEMO" if demo else "LIVE"
+        mode = "TESTNET" if demo else "LIVE"
         logger.info(f"Trade executor initialised in {mode} mode")
         self.instruments: dict[str, dict] = {}
         self._load_instruments()
