@@ -565,15 +565,39 @@ def api_trade():
             elif eq_f >= c.PHASE_2_EQUITY: risk_pct = base * 1.5
             else:                           risk_pct = base
 
-        # ── SL-aware notional sizing ────────────────────────────────────────
+        # ── Resolve SL/TP — accept price OR percentage ─────────────────────
+        mark = None
+        def _get_mark():
+            nonlocal mark
+            if mark is None:
+                try: mark = float(ex.get_mark_price(sym))
+                except Exception: mark = 0.0
+            return mark
+
         sl_price = d.get("stop_loss")
+        sl_pct   = d.get("sl_pct")    # e.g. 3.0 means 3%
+        tp_price = d.get("take_profit")
+        tp_pct   = d.get("tp_pct")
+
+        # Convert % inputs to prices
+        if sl_pct and not sl_price:
+            m = _get_mark()
+            if m > 0:
+                pct = float(sl_pct) / 100.0
+                sl_price = m * (1 - pct) if side == "Buy" else m * (1 + pct)
+        if tp_pct and not tp_price:
+            m = _get_mark()
+            if m > 0:
+                pct = float(tp_pct) / 100.0
+                tp_price = m * (1 + pct) if side == "Buy" else m * (1 - pct)
+
+        # SL distance for position sizing
         if sl_price:
-            try:
-                mark    = float(ex.get_mark_price(sym))
-                sl_dist = abs(mark - float(sl_price)) / mark if mark > 0 else c.AUTO_SL_PCT
-                sl_dist = max(sl_dist, 0.005)
-            except Exception:
-                sl_dist = c.AUTO_SL_PCT
+            m = _get_mark()
+            sl_dist = abs(m - float(sl_price)) / m if m > 0 else c.AUTO_SL_PCT
+            sl_dist = max(sl_dist, 0.005)
+        elif sl_pct:
+            sl_dist = max(float(sl_pct) / 100.0, 0.005)
         else:
             sl_dist = c.AUTO_SL_PCT
 
@@ -588,20 +612,18 @@ def api_trade():
 
         ok = ex.open_position(sym, side, cost, lev)
         if ok:
-            # Auto-SL if no SL was provided
-            if not sl_price and c.AUTO_SL_PCT > 0:
+            if sl_price:
+                try: ex.set_trading_stop(sym, side, stop_loss=round(float(sl_price), 6))
+                except Exception: pass
+            elif c.AUTO_SL_PCT > 0:
                 try:
-                    mark    = float(ex.get_mark_price(sym))
-                    auto_sl = mark * (1 - c.AUTO_SL_PCT) if side == "Buy" \
-                              else mark * (1 + c.AUTO_SL_PCT)
+                    m = _get_mark()
+                    auto_sl = m*(1-c.AUTO_SL_PCT) if side=="Buy" else m*(1+c.AUTO_SL_PCT)
                     ex.set_trading_stop(sym, side, stop_loss=round(auto_sl, 6))
-                except Exception:
-                    pass
-            if d.get("take_profit"):
-                try:
-                    ex.set_trading_stop(sym, side, take_profit=float(d["take_profit"]))
-                except Exception:
-                    pass
+                except Exception: pass
+            if tp_price:
+                try: ex.set_trading_stop(sym, side, take_profit=round(float(tp_price), 6))
+                except Exception: pass
             return jsonify({"success": True, "symbol": sym, "side": side,
                             "entry":    str(ex.get_mark_price(sym)),
                             "cost":     str(round(float(cost), 2)),
@@ -735,10 +757,35 @@ def api_test_signal():
         elif eq_f >= _c.PHASE_2_EQUITY: risk_pct = base * 1.5; phase = 2
         else:                            risk_pct = base;        phase = 1
 
-        sl_price = signal.get("stop_loss")
+        _mark = None
+        def _ts_mark():
+            nonlocal _mark
+            if _mark is None:
+                try: _mark = float(ex.get_mark_price(sym))
+                except Exception: _mark = 0.0
+            return _mark
+
+        sl_price = d.get("stop_loss")
+        sl_pct_v = d.get("sl_pct")
+        tp_price = d.get("take_profit")
+        tp_pct_v = d.get("tp_pct")
+
+        if sl_pct_v and not sl_price:
+            m = _ts_mark()
+            if m > 0:
+                p = float(sl_pct_v)/100.0
+                sl_price = m*(1-p) if side=="Buy" else m*(1+p)
+        if tp_pct_v and not tp_price:
+            m = _ts_mark()
+            if m > 0:
+                p = float(tp_pct_v)/100.0
+                tp_price = m*(1+p) if side=="Buy" else m*(1-p)
+
         if sl_price:
-            mark    = float(ex.get_mark_price(sym))
-            sl_dist = max(abs(mark - float(sl_price)) / mark, 0.005)
+            m = _ts_mark()
+            sl_dist = max(abs(m - float(sl_price)) / m, 0.005) if m > 0 else _c.AUTO_SL_PCT
+        elif sl_pct_v:
+            sl_dist = max(float(sl_pct_v)/100.0, 0.005)
         else:
             sl_dist = _c.AUTO_SL_PCT
 
@@ -750,13 +797,18 @@ def api_test_signal():
 
         ok = ex.open_position(sym, side, cost, lev)
         if ok:
-            if not sl_price and _c.AUTO_SL_PCT > 0:
+            if sl_price:
+                try: ex.set_trading_stop(sym, side, stop_loss=round(float(sl_price), 6))
+                except Exception: pass
+            elif _c.AUTO_SL_PCT > 0:
                 try:
-                    mark    = float(ex.get_mark_price(sym))
-                    auto_sl = mark*(1-_c.AUTO_SL_PCT) if side=="Buy" else mark*(1+_c.AUTO_SL_PCT)
+                    m = _ts_mark()
+                    auto_sl = m*(1-_c.AUTO_SL_PCT) if side=="Buy" else m*(1+_c.AUTO_SL_PCT)
                     ex.set_trading_stop(sym, side, stop_loss=round(auto_sl, 6))
-                except Exception:
-                    pass
+                except Exception: pass
+            if tp_price:
+                try: ex.set_trading_stop(sym, side, take_profit=round(float(tp_price), 6))
+                except Exception: pass
             return jsonify({
                 "success":  True,
                 "symbol":   sym,
@@ -2163,8 +2215,32 @@ select.inp option{background:var(--card);color:var(--text)}
         </select>
       </div>
       <div class="inp-wrap">
-        <label class="inp-lbl">SL Price (optional)</label>
-        <input class="inp" id="ts-sl" placeholder="auto">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <label class="inp-lbl" style="margin-bottom:0">Stop Loss</label>
+          <div style="display:flex;gap:2px">
+            <button id="ts-sl-mode-price" onclick="tsSlMode('price')"
+              style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;cursor:pointer;
+              background:var(--accent);color:#fff;border:none">Price</button>
+            <button id="ts-sl-mode-pct" onclick="tsSlMode('pct')"
+              style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;cursor:pointer;
+              background:var(--card2);color:var(--text2);border:1px solid var(--border)">%</button>
+          </div>
+        </div>
+        <input class="inp" id="ts-sl" placeholder="auto" step="any" type="number">
+      </div>
+      <div class="inp-wrap">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+          <label class="inp-lbl" style="margin-bottom:0">Take Profit</label>
+          <div style="display:flex;gap:2px">
+            <button id="ts-tp-mode-price" onclick="tsTpMode('price')"
+              style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;cursor:pointer;
+              background:var(--accent);color:#fff;border:none">Price</button>
+            <button id="ts-tp-mode-pct" onclick="tsTpMode('pct')"
+              style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;cursor:pointer;
+              background:var(--card2);color:var(--text2);border:1px solid var(--border)">%</button>
+          </div>
+        </div>
+        <input class="inp" id="ts-tp" placeholder="optional" step="any" type="number">
       </div>
     </div>
     <button class="btn btn-green" onclick="sendTestSignal()" style="margin-bottom:6px">
@@ -2494,11 +2570,31 @@ select.inp option{background:var(--card);color:var(--text)}
       </div>
       <div class="inp-grid mb">
         <div class="inp-wrap">
-          <label class="inp-lbl">Stop Loss (optional)</label>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <label class="inp-lbl" style="margin-bottom:0">Stop Loss</label>
+            <div style="display:flex;gap:2px">
+              <button id="ad-sl-mode-price" onclick="adSlMode('price')"
+                style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;cursor:pointer;
+                background:var(--accent);color:#fff;border:none">Price</button>
+              <button id="ad-sl-mode-pct" onclick="adSlMode('pct')"
+                style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;cursor:pointer;
+                background:var(--card2);color:var(--text2);border:1px solid var(--border)">%</button>
+            </div>
+          </div>
           <input class="inp" type="number" id="ad-sl" placeholder="0.0000" step="any">
         </div>
         <div class="inp-wrap">
-          <label class="inp-lbl">Take Profit (optional)</label>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <label class="inp-lbl" style="margin-bottom:0">Take Profit</label>
+            <div style="display:flex;gap:2px">
+              <button id="ad-tp-mode-price" onclick="adTpMode('price')"
+                style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;cursor:pointer;
+                background:var(--accent);color:#fff;border:none">Price</button>
+              <button id="ad-tp-mode-pct" onclick="adTpMode('pct')"
+                style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;cursor:pointer;
+                background:var(--card2);color:var(--text2);border:1px solid var(--border)">%</button>
+            </div>
+          </div>
           <input class="inp" type="number" id="ad-tp" placeholder="0.0000" step="any">
         </div>
       </div>
@@ -3795,10 +3891,34 @@ function renderAcctControls() {
               <input class="inp" type="number" id="accc-lv-${a.id}" min="1" max="100" placeholder="5" value="5"></div>
           </div>
           <div class="inp-grid mb">
-            <div class="inp-wrap"><label class="inp-lbl">Stop Loss</label>
-              <input class="inp" type="number" id="accc-slp-${a.id}" step="any" placeholder="optional"></div>
-            <div class="inp-wrap"><label class="inp-lbl">Take Profit</label>
-              <input class="inp" type="number" id="accc-tp-${a.id}" step="any" placeholder="optional"></div>
+            <div class="inp-wrap">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                <label class="inp-lbl" style="margin-bottom:0">Stop Loss</label>
+                <div style="display:flex;gap:2px">
+                  <button id="accc-sl-mode-price-${a.id}" onclick="acccSlMode('${a.id}','price')"
+                    style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;cursor:pointer;
+                    background:var(--accent);color:#fff;border:none">Price</button>
+                  <button id="accc-sl-mode-pct-${a.id}" onclick="acccSlMode('${a.id}','pct')"
+                    style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;cursor:pointer;
+                    background:var(--card2);color:var(--text2);border:1px solid var(--border)">%</button>
+                </div>
+              </div>
+              <input class="inp" type="number" id="accc-slp-${a.id}" step="any" placeholder="optional">
+            </div>
+            <div class="inp-wrap">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+                <label class="inp-lbl" style="margin-bottom:0">Take Profit</label>
+                <div style="display:flex;gap:2px">
+                  <button id="accc-tp-mode-price-${a.id}" onclick="acccTpMode('${a.id}','price')"
+                    style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;cursor:pointer;
+                    background:var(--accent);color:#fff;border:none">Price</button>
+                  <button id="accc-tp-mode-pct-${a.id}" onclick="acccTpMode('${a.id}','pct')"
+                    style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;cursor:pointer;
+                    background:var(--card2);color:var(--text2);border:1px solid var(--border)">%</button>
+                </div>
+              </div>
+              <input class="inp" type="number" id="accc-tp-${a.id}" step="any" placeholder="optional">
+            </div>
           </div>
           <div class="btn-grid">
             <button class="btn btn-green btn-sm" onclick="acccOpenTrade('${a.id}')">Open</button>
@@ -3848,10 +3968,11 @@ async function acccOpenTrade(id) {
   const sl   = document.getElementById('accc-slp-' + id)?.value;
   const tp   = document.getElementById('accc-tp-' + id)?.value;
   if (!sym) { toast('Enter symbol', false); return; }
-  const body = {symbol: sym.endsWith('USDT')?sym:sym+'USDT', side, leverage:lv, equity_pct:sz};
+  const body = {
+    symbol: sym.endsWith('USDT')?sym:sym+'USDT', side, leverage:lv, equity_pct:sz,
+    ...(_slTpBody(document.getElementById('accc-slp-'+id), document.getElementById('accc-tp-'+id)))
+  };
   if (id !== 'primary') body.account_id = id;
-  if (sl) body.stop_loss   = parseFloat(sl);
-  if (tp) body.take_profit = parseFloat(tp);
   const msgEl = document.getElementById('accc-msg-' + id);
   msgEl.style.display = 'block'; msgEl.style.color = 'var(--text3)'; msgEl.textContent = 'Sending…';
   try {
@@ -4093,10 +4214,9 @@ async function adOpenTrade() {
   if (!sym) { toast('Enter a symbol','err'); return; }
   const body = {
     symbol: sym.endsWith('USDT') ? sym : sym + 'USDT',
-    side, leverage: lev, equity_pct: sizePct, account_id: _adAccountId
+    side, leverage: lev, equity_pct: sizePct, account_id: _adAccountId,
+    ...(_slTpBody(document.getElementById('ad-sl'), document.getElementById('ad-tp')))
   };
-  if (sl) body.stop_loss   = parseFloat(sl);
-  if (tp) body.take_profit = parseFloat(tp);
   const msgEl = document.getElementById('ad-trade-msg');
   msgEl.style.display = 'block';
   msgEl.style.color = 'var(--text3)';
@@ -4124,6 +4244,7 @@ async function adOpenTrade() {
 
 function adClearTradeForm() {
   ['ad-sym','ad-sl','ad-tp'].forEach(i => document.getElementById(i).value = '');
+  adSlMode('price'); adTpMode('price');
   document.getElementById('ad-size-pct').value = '2';
   document.getElementById('ad-lev').value      = '5';
   document.getElementById('ad-trade-msg').style.display = 'none';
@@ -4472,6 +4593,35 @@ function tick() {
   if (countdown <= 0) { countdown = 12; fetchData(); }
 }
 
+/* ── SL/TP Price vs % Toggle helpers ─────────────────── */
+function _slTpToggle(priceBtn, pctBtn, inp, mode) {
+  const isPrice = mode === 'price';
+  priceBtn.style.background = isPrice ? 'var(--accent)' : 'var(--card2)';
+  priceBtn.style.color      = isPrice ? '#fff' : 'var(--text2)';
+  priceBtn.style.border     = isPrice ? 'none' : '1px solid var(--border)';
+  pctBtn.style.background   = isPrice ? 'var(--card2)' : 'var(--accent)';
+  pctBtn.style.color        = isPrice ? 'var(--text2)' : '#fff';
+  pctBtn.style.border       = isPrice ? '1px solid var(--border)' : 'none';
+  inp.placeholder = isPrice ? '0.0000' : '3.0';
+  inp.dataset.mode = mode;
+  inp.value = '';
+}
+function adSlMode(m)  { _slTpToggle(document.getElementById('ad-sl-mode-price'), document.getElementById('ad-sl-mode-pct'), document.getElementById('ad-sl'), m); }
+function adTpMode(m)  { _slTpToggle(document.getElementById('ad-tp-mode-price'), document.getElementById('ad-tp-mode-pct'), document.getElementById('ad-tp'), m); }
+function tsSlMode(m)  { _slTpToggle(document.getElementById('ts-sl-mode-price'), document.getElementById('ts-sl-mode-pct'), document.getElementById('ts-sl'), m); }
+function tsTpMode(m)  { _slTpToggle(document.getElementById('ts-tp-mode-price'), document.getElementById('ts-tp-mode-pct'), document.getElementById('ts-tp'), m); }
+function acccSlMode(id, m) { _slTpToggle(document.getElementById('accc-sl-mode-price-'+id), document.getElementById('accc-sl-mode-pct-'+id), document.getElementById('accc-slp-'+id), m); }
+function acccTpMode(id, m) { _slTpToggle(document.getElementById('accc-tp-mode-price-'+id), document.getElementById('accc-tp-mode-pct-'+id), document.getElementById('accc-tp-'+id), m); }
+
+function _slTpBody(slInp, tpInp) {
+  const slMode = slInp?.dataset?.mode || 'price';
+  const tpMode = tpInp?.dataset?.mode || 'price';
+  const out = {};
+  if (slInp?.value) { if (slMode === 'pct') out.sl_pct = parseFloat(slInp.value); else out.stop_loss = parseFloat(slInp.value); }
+  if (tpInp?.value) { if (tpMode === 'pct') out.tp_pct = parseFloat(tpInp.value); else out.take_profit = parseFloat(tpInp.value); }
+  return out;
+}
+
 /* ── Test Signal ─────────────────────────────────────── */
 function _populateTsAccounts() {
   const sel = document.getElementById('ts-acc');
@@ -4489,7 +4639,6 @@ async function sendTestSignal() {
   const accId = document.getElementById('ts-acc').value;
   const sym   = (document.getElementById('ts-sym').value || 'BTC').trim().toUpperCase();
   const side  = document.getElementById('ts-side').value;
-  const sl    = document.getElementById('ts-sl').value;
   const msg   = document.getElementById('ts-msg');
 
   msg.style.display = 'block';
@@ -4497,9 +4646,11 @@ async function sendTestSignal() {
   msg.style.color = 'var(--text2)';
   msg.textContent = 'Sending test signal…';
 
-  const body = { symbol: sym, side };
+  const body = {
+    symbol: sym, side,
+    ...(_slTpBody(document.getElementById('ts-sl'), document.getElementById('ts-tp')))
+  };
   if (accId) body.account_id = accId;
-  if (sl)    body.stop_loss = parseFloat(sl);
 
   try {
     const r = await fetch('/api/test-signal', {
