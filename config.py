@@ -71,8 +71,8 @@ AUTO_SL_PCT      = float(os.getenv("AUTO_SL_PCT", "0.03"))
 # Phase 1 (0→750): RISK_PCT used as-is.
 # Phase 2 (750→1500): risk multiplied by 1.5×.
 # Phase 3 (1500+): risk multiplied by 2.5×.
-PHASE_2_EQUITY   = float(os.getenv("PHASE_2_EQUITY", "750"))
-PHASE_3_EQUITY   = float(os.getenv("PHASE_3_EQUITY", "1500"))
+PHASE_2_EQUITY   = float(os.getenv("PHASE_2_EQUITY", "100000"))
+PHASE_3_EQUITY   = float(os.getenv("PHASE_3_EQUITY", "150000"))
 
 # DAILY_DD_LIMIT: fraction of day-start equity — if daily loss exceeds this,
 # the circuit breaker trips and all new signal execution is blocked until
