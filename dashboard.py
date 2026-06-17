@@ -532,36 +532,81 @@ def api_connectivity():
 @app.route("/api/trade", methods=["POST"])
 def api_trade():
     from decimal import Decimal
-    d    = request.get_json() or {}
-    sym  = d.get("symbol", "").upper().strip()
-    side = d.get("side", "Buy")
+    d      = request.get_json() or {}
+    sym    = d.get("symbol", "").upper().strip()
+    side   = d.get("side", "Buy")
     acc_id = d.get("account_id")
     if not sym: return jsonify({"success": False, "error": "Symbol required"})
     if not sym.endswith("USDT"): sym += "USDT"
     try:
+        c = _cfg()
         if acc_id:
             from accounts_manager import load_accounts, get_executor
             accs = load_accounts()
             acc  = next((a for a in accs if a["id"] == acc_id), None)
             if not acc: return jsonify({"success": False, "error": "Account not found"})
-            ex      = get_executor(acc)
-            eq_frac = Decimal(str(acc.get("equity_fraction", 0.1)))
-            lev     = Decimal(str(acc.get("leverage", 5)))
+            ex  = get_executor(acc)
+            lev = Decimal(str(d.get("leverage") or acc.get("leverage", c.DEFAULT_LEVERAGE)))
         else:
-            cfg = _cfg(); ex = _executor()
-            eq_frac = Decimal(str(cfg.EQUITY_FRACTION))
-            lev     = Decimal(str(cfg.DEFAULT_LEVERAGE))
+            ex  = _executor()
+            lev = Decimal(str(d.get("leverage") or c.DEFAULT_LEVERAGE))
+
         equity = ex.get_equity()
-        cost   = equity * eq_frac
+        eq_f   = float(equity)
+
+        # ── Phase-based risk % ──────────────────────────────────────────────
+        # Manual override: form sends equity_pct (labelled "Risk %") — treat as risk %
+        manual_risk = d.get("equity_pct")
+        if manual_risk:
+            risk_pct = float(manual_risk) / 100.0
+        else:
+            base = c.RISK_PCT
+            if eq_f >= c.PHASE_3_EQUITY:   risk_pct = base * 2.5
+            elif eq_f >= c.PHASE_2_EQUITY: risk_pct = base * 1.5
+            else:                           risk_pct = base
+
+        # ── SL-aware notional sizing ────────────────────────────────────────
+        sl_price = d.get("stop_loss")
+        if sl_price:
+            try:
+                mark    = float(ex.get_mark_price(sym))
+                sl_dist = abs(mark - float(sl_price)) / mark if mark > 0 else c.AUTO_SL_PCT
+                sl_dist = max(sl_dist, 0.005)
+            except Exception:
+                sl_dist = c.AUTO_SL_PCT
+        else:
+            sl_dist = c.AUTO_SL_PCT
+
+        risk_amount = equity * Decimal(str(risk_pct))
+        notional    = risk_amount / Decimal(str(sl_dist))
+        cost        = notional / lev
+
         if cost <= 0:
-            return jsonify({"success": False, "error": f"Account equity is {float(equity):.2f} USDT — deposit funds first"})
+            return jsonify({"success": False, "error": f"Equity {eq_f:.2f} USDT — deposit funds first"})
         if sym not in ex.instruments:
-            return jsonify({"success": False, "error": f"{sym} is not a tradeable USDT perpetual on Bybit"})
-        ok   = ex.open_position(sym, side, cost, lev)
+            return jsonify({"success": False, "error": f"{sym} is not a tradeable USDT perpetual"})
+
+        ok = ex.open_position(sym, side, cost, lev)
         if ok:
+            # Auto-SL if no SL was provided
+            if not sl_price and c.AUTO_SL_PCT > 0:
+                try:
+                    mark    = float(ex.get_mark_price(sym))
+                    auto_sl = mark * (1 - c.AUTO_SL_PCT) if side == "Buy" \
+                              else mark * (1 + c.AUTO_SL_PCT)
+                    ex.set_trading_stop(sym, side, stop_loss=round(auto_sl, 6))
+                except Exception:
+                    pass
+            if d.get("take_profit"):
+                try:
+                    ex.set_trading_stop(sym, side, take_profit=float(d["take_profit"]))
+                except Exception:
+                    pass
             return jsonify({"success": True, "symbol": sym, "side": side,
-                            "entry": str(ex.get_mark_price(sym)),
-                            "cost": str(round(float(cost), 2))})
+                            "entry":    str(ex.get_mark_price(sym)),
+                            "cost":     str(round(float(cost), 2)),
+                            "notional": str(round(float(notional), 2)),
+                            "risk_pct": round(risk_pct * 100, 2)})
         err = getattr(ex, "last_open_error", "") or "Order placement failed — check Railway logs"
         return jsonify({"success": False, "error": err})
     except Exception as e:
@@ -2277,8 +2322,8 @@ select.inp option{background:var(--card);color:var(--text)}
       </div>
       <div class="inp-grid mb">
         <div class="inp-wrap">
-          <label class="inp-lbl">Size % of equity</label>
-          <input class="inp" type="number" id="ad-size-pct" min="1" max="100" placeholder="10" value="10">
+          <label class="inp-lbl">Risk % (overrides phase default)</label>
+          <input class="inp" type="number" id="ad-size-pct" min="0.1" max="20" step="0.1" placeholder="2" value="2">
         </div>
         <div class="inp-wrap">
           <label class="inp-lbl">Leverage ×</label>
@@ -3581,8 +3626,8 @@ function renderAcctControls() {
               <select class="inp" id="accc-side-${a.id}"><option value="Buy">Long ↑</option><option value="Sell">Short ↓</option></select></div>
           </div>
           <div class="inp-grid mb">
-            <div class="inp-wrap"><label class="inp-lbl">Size % of equity</label>
-              <input class="inp" type="number" id="accc-sz-${a.id}" min="1" max="100" placeholder="10" value="10"></div>
+            <div class="inp-wrap"><label class="inp-lbl">Risk % override</label>
+              <input class="inp" type="number" id="accc-sz-${a.id}" min="0.1" max="20" step="0.1" placeholder="2" value="2"></div>
             <div class="inp-wrap"><label class="inp-lbl">Leverage ×</label>
               <input class="inp" type="number" id="accc-lv-${a.id}" min="1" max="100" placeholder="5" value="5"></div>
           </div>
@@ -3878,7 +3923,7 @@ async function adCloseAll() {
 async function adOpenTrade() {
   const sym     = (document.getElementById('ad-sym').value || '').trim().toUpperCase();
   const side    = document.getElementById('ad-side').value;
-  const sizePct = parseFloat(document.getElementById('ad-size-pct').value) || 10;
+  const sizePct = parseFloat(document.getElementById('ad-size-pct').value) || 2;
   const lev     = parseInt(document.getElementById('ad-lev').value) || 5;
   const sl      = document.getElementById('ad-sl').value;
   const tp      = document.getElementById('ad-tp').value;
@@ -3916,7 +3961,7 @@ async function adOpenTrade() {
 
 function adClearTradeForm() {
   ['ad-sym','ad-sl','ad-tp'].forEach(i => document.getElementById(i).value = '');
-  document.getElementById('ad-size-pct').value = '10';
+  document.getElementById('ad-size-pct').value = '2';
   document.getElementById('ad-lev').value      = '5';
   document.getElementById('ad-trade-msg').style.display = 'none';
   document.getElementById('ad-trade-preview').style.display = 'none';

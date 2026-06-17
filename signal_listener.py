@@ -236,17 +236,57 @@ def _broadcast_to_additional_accounts(signal: dict) -> None:
         logger.info(f"[multi-account] Broadcasting to {len(active)} additional account(s)")
         for acc in active:
             try:
-                ex       = TradeExecutor(api_key=acc["api_key"], api_secret=acc["api_secret"],
-                                         testnet=acc.get("testnet", False))
-                eq_frac  = Decimal(str(acc.get("equity_fraction", config.EQUITY_FRACTION)))
-                lev      = Decimal(str(acc.get("leverage",        config.DEFAULT_LEVERAGE)))
-                equity   = ex.get_equity()
-                cost     = equity * eq_frac
-                name     = acc.get("name", acc["id"])
-                logger.info(f"[{name}] equity={equity:.2f} | {float(eq_frac)*100:.0f}% = {cost:.2f} USDT | {lev}x")
+                ex     = TradeExecutor(api_key=acc["api_key"], api_secret=acc["api_secret"],
+                                       testnet=acc.get("testnet", False))
+                lev    = Decimal(str(acc.get("leverage", config.DEFAULT_LEVERAGE)))
+                equity = ex.get_equity()
+                eq_f   = float(equity)
+                name   = acc.get("name", acc["id"])
+
+                # ── Phase-based risk (same strategy applied per-account equity) ──
+                base_risk = config.RISK_PCT
+                if eq_f >= config.PHASE_3_EQUITY:
+                    risk_pct = base_risk * 2.5; phase = 3
+                elif eq_f >= config.PHASE_2_EQUITY:
+                    risk_pct = base_risk * 1.5; phase = 2
+                else:
+                    risk_pct = base_risk;        phase = 1
+
+                # ── SL-aware sizing ────────────────────────────────────────────
+                sl_raw = signal.get("stop_loss")
+                sl_f   = float(sl_raw) if sl_raw else None
+                try:
+                    entry_f = float(ex.get_mark_price(signal["symbol"]))
+                except Exception:
+                    entry_f = 0.0
+                if sl_f and entry_f > 0:
+                    sl_dist = abs(entry_f - sl_f) / entry_f
+                    sl_dist = max(sl_dist, 0.005)
+                else:
+                    sl_dist = config.AUTO_SL_PCT
+
+                risk_amount = equity * Decimal(str(risk_pct))
+                cost        = (risk_amount / Decimal(str(sl_dist))) / lev
+
+                logger.info(
+                    f"[{name}] Phase {phase} | equity={eq_f:.2f} | risk={risk_pct*100:.1f}% "
+                    f"(${float(risk_amount):.2f}) | SL_dist={sl_dist*100:.2f}% | "
+                    f"notional=${float(risk_amount/Decimal(str(sl_dist))):.2f} | margin=${float(cost):.2f} | {lev}x"
+                )
                 for attempt in range(1, 4):
                     if ex.open_position(signal["symbol"], signal["side"], cost, lev):
                         logger.info(f"[{name}] ✅ OPENED {signal['side']} {signal['symbol']}")
+                        # Auto-SL if signal had none
+                        if not sl_f and entry_f and config.AUTO_SL_PCT > 0:
+                            try:
+                                cur = float(ex.get_mark_price(signal["symbol"]))
+                                auto_sl = cur * (1 - config.AUTO_SL_PCT) if signal["side"] == "Buy" \
+                                          else cur * (1 + config.AUTO_SL_PCT)
+                                ex.set_trading_stop(signal["symbol"], signal["side"],
+                                                    stop_loss=round(auto_sl, 6))
+                                logger.info(f"[{name}] [AUTO-SL] {auto_sl:.6f}")
+                            except Exception as _sl_e:
+                                logger.warning(f"[{name}] [AUTO-SL] failed: {_sl_e}")
                         _push_sse({"type": "account_trade", "account": name,
                                    "symbol": signal["symbol"], "side": signal["side"],
                                    "status": "opened"})
