@@ -35,22 +35,26 @@ def _apply_proxy() -> str | None:
 
 
 class TradeExecutor:
-    def __init__(self, api_key: str = None, api_secret: str = None, testnet: bool = None):
+    def __init__(self, api_key: str = None, api_secret: str = None,
+                 testnet: bool = None, demo: bool = False):
         """
         Initialise executor.  If api_key / api_secret are omitted the values
         from config (env vars) are used — preserving full backward compatibility.
-        Pass them explicitly when managing multiple trading accounts.
+
+        testnet=True  → api-testnet.bybit.com  (Bybit Testnet, separate credentials)
+        demo=True     → api.bybit.com with demo flag  (Bybit Demo Trading)
+        Both False    → api.bybit.com live
         """
-        key    = api_key    if api_key    else config.API_KEY
-        secret = api_secret if api_secret else config.API_SECRET
-        demo   = testnet    if testnet is not None else config.USE_TESTNET
+        key          = api_key    if api_key    else config.API_KEY
+        secret       = api_secret if api_secret else config.API_SECRET
+        use_testnet  = testnet    if testnet is not None else config.USE_TESTNET
+        use_demo     = demo
 
         if not key or not secret:
             raise ValueError("BYBIT_API_KEY and BYBIT_API_SECRET must be set")
 
         proxy = _apply_proxy()
         if proxy:
-            # Mask credentials for logging
             safe = proxy.split("@")[-1] if "@" in proxy else proxy[:40]
             logger.info(f"[proxy] Bybit requests routed via {safe}")
         else:
@@ -59,10 +63,15 @@ class TradeExecutor:
         self.client = HTTP(
             api_key=key,
             api_secret=secret,
-            testnet=demo,   # testnet.bybit.com when True
-            demo=False,
+            testnet=use_testnet,
+            demo=use_demo,
         )
-        mode = "TESTNET" if demo else "LIVE"
+        if use_testnet:
+            mode = "TESTNET"
+        elif use_demo:
+            mode = "DEMO"
+        else:
+            mode = "LIVE"
         logger.info(f"Trade executor initialised in {mode} mode")
         self.instruments: dict[str, dict] = {}
         self._load_instruments()

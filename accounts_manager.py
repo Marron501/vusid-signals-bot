@@ -31,7 +31,8 @@ _DEFAULTS: dict = {
     "leverage":        5,
     "enabled":         True,
     "auto_execute":    True,   # execute signals automatically on this account
-    "testnet":         False,
+    "testnet":         False,   # True → api-testnet.bybit.com (Bybit Testnet)
+    "demo":            False,   # True → api.bybit.com with demo flag (Bybit Demo Trading)
     "note":            "",
 }
 
@@ -124,6 +125,7 @@ def get_executor(account: dict):
         api_key    = account["api_key"],
         api_secret = account["api_secret"],
         testnet    = account.get("testnet", False),
+        demo       = account.get("demo", False),
     )
 
 

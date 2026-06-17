@@ -92,7 +92,8 @@ def _momentum_monitor_loop():
                     try:
                         ex2 = TradeExecutor(api_key=acc["api_key"],
                                             api_secret=acc["api_secret"],
-                                            testnet=acc.get("testnet", False))
+                                            testnet=acc.get("testnet", False),
+                                            demo=acc.get("demo", False))
                         for pos in ex2.get_my_positions().values():
                             positions_to_check.append({**pos, "account_name": acc.get("name", acc["id"])})
                     except Exception:
@@ -949,7 +950,7 @@ def api_positions():
         try:
             ex = _get_acc_ex(acc)
             return _map_pos(ex.get_my_positions(), acc["id"], acc["name"],
-                            acc.get("testnet", False))
+                            acc.get("demo", False) or acc.get("testnet", False))
         except Exception as e:
             log.error(f"[positions] {acc['name']}: {e}")
             return []
@@ -963,7 +964,7 @@ def api_positions():
             all_pos.extend(f.result())
 
     account_meta = [{"id": a["id"], "name": a["name"],
-                     "is_demo": a.get("testnet", False)} for a in extras]
+                     "is_demo": a.get("demo", False) or a.get("testnet", False)} for a in extras]
     return jsonify({"positions": all_pos, "total": len(all_pos),
                     "accounts": account_meta})
 
@@ -2330,10 +2331,16 @@ select.inp option{background:var(--card);color:var(--text)}
       <div class="inp-wrap"><label class="inp-lbl">Leverage (×)</label><input class="inp" type="number" id="m-lev" value="5" min="1" max="100"></div>
       <div class="inp-wrap inp-full"><label class="inp-lbl">Note (optional)</label><input class="inp" type="text" id="m-note" placeholder="e.g. Client managed account"></div>
     </div>
-    <div class="toggle-row" style="margin-bottom:16px">
-      <div class="toggle-info"><strong>Testnet / Demo Mode</strong><span>Enable for paper trading</span></div>
-      <label class="switch"><input type="checkbox" id="m-testnet"><span class="sw-track"></span></label>
+    <div class="inp-wrap inp-full" style="margin-bottom:16px">
+      <label class="inp-lbl">Account Mode</label>
+      <div style="display:flex;gap:8px;margin-top:6px" id="m-mode-btns">
+        <button type="button" class="btn btn-sm" id="m-mode-live"    onclick="setAccMode('live')"    style="flex:1">Live</button>
+        <button type="button" class="btn btn-sm" id="m-mode-demo"    onclick="setAccMode('demo')"    style="flex:1">Demo</button>
+        <button type="button" class="btn btn-sm" id="m-mode-testnet" onclick="setAccMode('testnet')" style="flex:1">Testnet</button>
+      </div>
+      <div id="m-mode-hint" style="font-size:11px;color:var(--muted);margin-top:6px">Live — real trading on bybit.com</div>
     </div>
+    <input type="hidden" id="m-acc-mode" value="live">
     <input type="hidden" id="m-edit-id" value="">
     <div class="btn-grid">
       <button class="btn btn-ghost btn-sm" onclick="closeModal()">Cancel</button>
@@ -3748,7 +3755,7 @@ function renderAccList() {
       <div class="acc-badges">
         <span class="pill pill-blue">${(a.equity_fraction*100).toFixed(0)}% equity</span>
         <span class="pill pill-cyan">${a.leverage}× lev</span>
-        <span class="pill pill-gray">${a.testnet?'Demo':'LIVE'}</span>
+        <span class="pill pill-gray">${a.testnet?'TESTNET':a.demo?'DEMO':'LIVE'}</span>
         ${a.note?`<span class="pill pill-gray">${a.note.slice(0,22)}</span>`:''}
       </div>
       <div class="toggle-row" style="margin-top:10px;padding:8px 0;border-top:1px solid var(--border)">
@@ -3818,7 +3825,7 @@ function renderHomeAccounts() {
     const pnl = cached.unrealised_pnl != null ? cached.unrealised_pnl : null;
     const pnlTxt = pnl != null ? ((pnl >= 0 ? '+' : '') + pnl.toFixed(2)) : '—';
     const pnlCls = pnl != null ? (pnl >= 0 ? 'pos' : 'neg') : '';
-    const isDemo = a.testnet || false;
+    const isDemo = a.demo || a.testnet || false;
     cards.push(`<div class="acct-mini ${isDemo?'demo':''}" onclick="openAccountDetail('${a.id}')">
       <div class="acct-mini-icon" style="${isDemo?'background:var(--cyanbg)':''}">
         <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="${isDemo?'var(--cyan)':'var(--accent)'}" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4" stroke-linecap="round" stroke-linejoin="round"/><path stroke-linecap="round" stroke-linejoin="round" d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -3850,7 +3857,7 @@ function renderAcctControls() {
   const primary = {id:'primary', name:'Primary Account', testnet:false, leverage: document.getElementById('inp-lev')?.value || 5, equity_pct: 10};
   const all = [primary, ..._accounts];
   list.innerHTML = all.map(a => {
-    const isDm = a.testnet || false;
+    const isDm = a.demo || a.testnet || false;
     return `<div class="acct-ctrl-card" id="accc-${a.id}">
       <div class="acct-ctrl-head" onclick="toggleAcctCtrl('${a.id}')">
         <div style="display:flex;align-items:center;gap:8px">
@@ -4472,12 +4479,26 @@ function closeAccountDetail() {
   _adAccountId = null;
 }
 
+const _MODE_HINTS = {
+  live:    'Live — real trading on bybit.com',
+  demo:    'Demo — paper trading on bybit.com (Bybit Demo account)',
+  testnet: 'Testnet — separate testnet.bybit.com credentials',
+};
+function setAccMode(mode) {
+  document.getElementById('m-acc-mode').value = mode;
+  ['live','demo','testnet'].forEach(m => {
+    const b = document.getElementById('m-mode-'+m);
+    b.classList.toggle('btn-primary', m === mode);
+    b.classList.toggle('btn-ghost',   m !== mode);
+  });
+  document.getElementById('m-mode-hint').textContent = _MODE_HINTS[mode] || '';
+}
 function openAddAccount() {
   document.getElementById('modal-title-txt').textContent = 'Add Account';
   ['m-name','m-key','m-secret','m-note'].forEach(i => document.getElementById(i).value = '');
   document.getElementById('m-eq').value = '10';
   document.getElementById('m-lev').value = '5';
-  document.getElementById('m-testnet').checked = false;
+  setAccMode('live');
   document.getElementById('m-edit-id').value = '';
   document.getElementById('acc-modal').classList.add('open');
 }
@@ -4491,19 +4512,22 @@ function editAccount(id) {
   document.getElementById('m-eq').value    = (a.equity_fraction*100).toFixed(0);
   document.getElementById('m-lev').value   = a.leverage;
   document.getElementById('m-note').value  = a.note || '';
-  document.getElementById('m-testnet').checked = a.testnet || false;
+  const mode = a.testnet ? 'testnet' : (a.demo ? 'demo' : 'live');
+  setAccMode(mode);
   document.getElementById('m-edit-id').value = id;
   document.getElementById('acc-modal').classList.add('open');
 }
 function closeModal() { document.getElementById('acc-modal').classList.remove('open'); }
 async function saveAccount() {
-  const eid = document.getElementById('m-edit-id').value;
+  const eid  = document.getElementById('m-edit-id').value;
+  const mode = document.getElementById('m-acc-mode').value || 'live';
   const data = {
     name:            document.getElementById('m-name').value.trim(),
     equity_fraction: parseFloat(document.getElementById('m-eq').value) / 100,
     leverage:        parseFloat(document.getElementById('m-lev').value),
     note:            document.getElementById('m-note').value.trim(),
-    testnet:         document.getElementById('m-testnet').checked,
+    testnet:         mode === 'testnet',
+    demo:            mode === 'demo',
   };
   const key = document.getElementById('m-key').value.trim();
   const sec = document.getElementById('m-secret').value.trim();
@@ -4630,7 +4654,7 @@ function _populateTsAccounts() {
   _accounts.forEach(a => {
     const opt = document.createElement('option');
     opt.value = a.id;
-    opt.textContent = a.name + (a.testnet ? ' (Demo)' : '');
+    opt.textContent = a.name + (a.testnet ? ' (Testnet)' : a.demo ? ' (Demo)' : '');
     sel.appendChild(opt);
   });
 }
