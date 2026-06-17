@@ -1485,45 +1485,14 @@ select.inp option{background:var(--card);color:var(--text)}
     <!-- Prolific 3D logo mark -->
     <svg width="42" height="42" viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="lg-face" x1="0" y1="0" x2="0.6" y2="1" gradientUnits="objectBoundingBox">
-          <stop offset="0%"   stop-color="#4A7FD4"/>
-          <stop offset="45%"  stop-color="#1A3A6B"/>
+        <linearGradient id="lg-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%"   stop-color="#2563EB"/>
           <stop offset="100%" stop-color="#0D1F3C"/>
         </linearGradient>
-        <linearGradient id="lg-right" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
-          <stop offset="0%"   stop-color="#0A1628"/>
-          <stop offset="100%" stop-color="#060D18"/>
-        </linearGradient>
-        <linearGradient id="lg-bot" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
-          <stop offset="0%"   stop-color="#0C1A30"/>
-          <stop offset="100%" stop-color="#060E1C"/>
-        </linearGradient>
-        <radialGradient id="lg-shine" cx="30%" cy="28%" r="55%">
-          <stop offset="0%"   stop-color="rgba(180,210,255,0.6)"/>
-          <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
-        </radialGradient>
-        <filter id="lg-shad" x="-25%" y="-25%" width="170%" height="170%">
-          <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#000" flood-opacity="0.42"/>
-        </filter>
       </defs>
-      <!-- 3D right face -->
-      <path d="M32 5 L39 10 L39 35 L32 30 Z" fill="url(#lg-right)"/>
-      <!-- 3D bottom face -->
-      <path d="M5 32 L32 32 L39 37 L12 37 Z" fill="url(#lg-bot)"/>
-      <!-- Main front face -->
-      <rect x="3" y="3" width="29" height="29" rx="8" fill="url(#lg-face)" filter="url(#lg-shad)"/>
-      <!-- Top-edge highlight -->
-      <rect x="3" y="3" width="29" height="4" rx="4" fill="rgba(180,210,255,0.45)"/>
-      <!-- Left-edge highlight -->
-      <rect x="3" y="3" width="4" height="29" rx="4" fill="rgba(180,210,255,0.25)"/>
-      <!-- Glass shine spot -->
-      <ellipse cx="13" cy="12" rx="9" ry="5.5" fill="url(#lg-shine)"/>
+      <circle cx="21" cy="21" r="20" fill="url(#lg-bg)"/>
       <!-- P letterform -->
-      <path d="M8 10h9a5.5 5.5 0 0 1 0 11h-4.5v7H8V10z" fill="white" opacity="0.95"/>
-      <!-- Trend arrow (right area) -->
-      <polyline points="20,25 22,20 24,23 28,14" stroke="white" stroke-width="2.2"
-        stroke-linecap="round" stroke-linejoin="round" opacity="0.9"/>
-      <polygon points="30,12 26,13 28,16" fill="white" opacity="0.9"/>
+      <path d="M13 11h8a6 6 0 0 1 0 12h-4v8h-4V11z" fill="white" opacity="0.95"/>
     </svg>
     <div>
       <div class="brand-name">Prolific</div>
