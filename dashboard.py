@@ -925,9 +925,9 @@ button,input,select{font-family:inherit}
   position:sticky;top:0;z-index:60;transition:background .3s,border-color .3s;
   overflow:hidden;box-shadow:0 1px 0 var(--border),0 2px 12px var(--shadow)}
 .brand-name{font-size:22px;font-weight:900;letter-spacing:-.5px;
-  background:linear-gradient(180deg,#FFE566 0%,#FFAB00 45%,#E06800 100%);
+  background:linear-gradient(180deg,#6AAEFF 0%,#1A5FCC 45%,#0D2E6B 100%);
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
-  filter:drop-shadow(0 1px 0 rgba(100,42,0,.95)) drop-shadow(0 3px 8px rgba(0,0,0,.3))}
+  filter:drop-shadow(0 1px 0 rgba(0,20,80,.95)) drop-shadow(0 3px 8px rgba(0,0,0,.3))}
 .brand-sub{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:2px;color:var(--text3)}
 .top-right{display:flex;align-items:center;gap:8px}
 .icon-btn{width:34px;height:34px;border-radius:9px;border:1px solid var(--border);
@@ -1486,20 +1486,20 @@ select.inp option{background:var(--card);color:var(--text)}
     <svg width="42" height="42" viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
         <linearGradient id="lg-face" x1="0" y1="0" x2="0.6" y2="1" gradientUnits="objectBoundingBox">
-          <stop offset="0%"   stop-color="#FFE566"/>
-          <stop offset="45%"  stop-color="#FFAB00"/>
-          <stop offset="100%" stop-color="#E06800"/>
+          <stop offset="0%"   stop-color="#4A7FD4"/>
+          <stop offset="45%"  stop-color="#1A3A6B"/>
+          <stop offset="100%" stop-color="#0D1F3C"/>
         </linearGradient>
         <linearGradient id="lg-right" x1="0" y1="0" x2="1" y2="0" gradientUnits="objectBoundingBox">
-          <stop offset="0%"   stop-color="#B36200"/>
-          <stop offset="100%" stop-color="#4A2A00"/>
+          <stop offset="0%"   stop-color="#0A1628"/>
+          <stop offset="100%" stop-color="#060D18"/>
         </linearGradient>
         <linearGradient id="lg-bot" x1="0" y1="0" x2="0" y2="1" gradientUnits="objectBoundingBox">
-          <stop offset="0%"   stop-color="#7A4400"/>
-          <stop offset="100%" stop-color="#3D1E00"/>
+          <stop offset="0%"   stop-color="#0C1A30"/>
+          <stop offset="100%" stop-color="#060E1C"/>
         </linearGradient>
         <radialGradient id="lg-shine" cx="30%" cy="28%" r="55%">
-          <stop offset="0%"   stop-color="rgba(255,255,230,0.65)"/>
+          <stop offset="0%"   stop-color="rgba(180,210,255,0.6)"/>
           <stop offset="100%" stop-color="rgba(255,255,255,0)"/>
         </radialGradient>
         <filter id="lg-shad" x="-25%" y="-25%" width="170%" height="170%">
@@ -1513,9 +1513,9 @@ select.inp option{background:var(--card);color:var(--text)}
       <!-- Main front face -->
       <rect x="3" y="3" width="29" height="29" rx="8" fill="url(#lg-face)" filter="url(#lg-shad)"/>
       <!-- Top-edge highlight -->
-      <rect x="3" y="3" width="29" height="4" rx="4" fill="rgba(255,255,210,0.55)"/>
+      <rect x="3" y="3" width="29" height="4" rx="4" fill="rgba(180,210,255,0.45)"/>
       <!-- Left-edge highlight -->
-      <rect x="3" y="3" width="4" height="29" rx="4" fill="rgba(255,255,210,0.35)"/>
+      <rect x="3" y="3" width="4" height="29" rx="4" fill="rgba(180,210,255,0.25)"/>
       <!-- Glass shine spot -->
       <ellipse cx="13" cy="12" rx="9" ry="5.5" fill="url(#lg-shine)"/>
       <!-- P letterform -->
