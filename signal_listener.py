@@ -740,6 +740,49 @@ class DiscordSignalClient(discord.Client):
                         )
                         continue
 
+                # ── Risk Guard: circuit breaker + position cap ────────────
+                if signal["action"] == "open":
+                    import risk_guard as _rg
+                    try:
+                        _cur_eq = float(self.signal_executor.executor.get_equity())
+                    except Exception:
+                        _cur_eq = 0.0
+                    _guard = _rg.check(_cur_eq, config.DAILY_DD_LIMIT)
+                    if not _guard["ok"]:
+                        reason = (
+                            f"Circuit breaker active — daily PnL "
+                            f"{_guard['daily_pnl_pct']:.2f}% "
+                            f"(limit: -{_guard['dd_limit_pct']:.1f}%)"
+                        )
+                        log_entry["reason"] = reason
+                        logger.warning(f"[RiskGuard] BLOCKED: {reason}")
+                        _save_signal(log_entry); _entry_saved = True
+                        _push_sse({"type": "signal", "entry": log_entry})
+                        await self._dm_owner(
+                            f"⛔ **Trade BLOCKED — Circuit Breaker**\n"
+                            f"────────────────────\n"
+                            f"Signal: **{signal.get('side','')} {signal.get('symbol','')}**\n"
+                            f"Daily PnL: `{_guard['daily_pnl_pct']:.2f}%` "
+                            f"(limit: `-{_guard['dd_limit_pct']:.1f}%`)\n"
+                            f"Reset from the dashboard to resume trading."
+                        )
+                        continue
+                    try:
+                        _open_pos = len(self.signal_executor.executor.get_my_positions())
+                    except Exception:
+                        _open_pos = 0
+                    if _open_pos >= config.MAX_OPEN_POSITIONS:
+                        reason = (
+                            f"Max positions reached "
+                            f"({_open_pos}/{config.MAX_OPEN_POSITIONS}) — "
+                            f"{signal.get('symbol','')} skipped"
+                        )
+                        log_entry["reason"] = reason
+                        logger.warning(f"[RiskGuard] BLOCKED: {reason}")
+                        _save_signal(log_entry); _entry_saved = True
+                        _push_sse({"type": "signal", "entry": log_entry})
+                        continue
+
                 # ── Execute ───────────────────────────────────────────────
                 exec_error = ""
                 try:

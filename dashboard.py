@@ -693,6 +693,37 @@ def api_market_ticker():
         return jsonify(_mkt_cache["data"] or {"gainers": [], "losers": []})
 
 
+@app.route("/api/risk-guard", methods=["GET"])
+def api_risk_guard_get():
+    import risk_guard as _rg
+    state = _rg.get_state()
+    try:
+        eq = _executor().get_equity()
+        current = float(eq)
+    except Exception:
+        current = 0.0
+    import config as _c
+    result = _rg.check(current, _c.DAILY_DD_LIMIT)
+    result["max_positions"]  = _c.MAX_OPEN_POSITIONS
+    result["dd_limit_pct"]   = round(_c.DAILY_DD_LIMIT * 100, 1)
+    try:
+        result["open_positions"] = len(_executor().get_my_positions())
+    except Exception:
+        result["open_positions"] = 0
+    return jsonify(result)
+
+
+@app.route("/api/risk-guard/reset", methods=["POST"])
+def api_risk_guard_reset():
+    import risk_guard as _rg
+    try:
+        eq = float(_executor().get_equity())
+    except Exception:
+        eq = None
+    _rg.manual_reset(eq)
+    return jsonify({"success": True})
+
+
 @app.route("/api/fear-greed")
 def api_fear_greed():
     """Crypto Fear & Greed Index from alternative.me — cached 5 min."""
@@ -1648,6 +1679,47 @@ select.inp option{background:var(--card);color:var(--text)}
       <div style="display:none" id="cfg-auto"></div>
       <div style="display:none" id="cfg-eq"></div>
       <div style="display:none" id="cfg-lev"></div>
+    </div>
+  </div>
+
+  <!-- Risk Guard Card -->
+  <div class="card" id="rg-card" style="margin-bottom:12px;padding:14px 16px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--text3)">RISK GUARD</div>
+      <div style="display:flex;align-items:center;gap:6px">
+        <div id="rg-status-pill" style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:6px;
+          background:rgba(52,199,89,.15);color:#34C759">TRADING OK</div>
+        <button onclick="rgReset()" id="rg-reset-btn" style="display:none;background:rgba(255,59,48,.15);
+          border:1px solid rgba(255,59,48,.3);border-radius:6px;padding:2px 8px;cursor:pointer;
+          font-size:9px;font-weight:800;color:#FF3B30">RESET</button>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+      <div style="background:var(--card2);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Daily PnL</div>
+        <div id="rg-daily-pnl" style="font-size:16px;font-weight:900;color:var(--text)">—</div>
+        <div id="rg-daily-pct" style="font-size:10px;color:var(--text2)">—</div>
+      </div>
+      <div style="background:var(--card2);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">DD Limit</div>
+        <div id="rg-dd-limit" style="font-size:16px;font-weight:900;color:var(--yellow)">5%</div>
+        <div style="font-size:10px;color:var(--text2)">per day</div>
+      </div>
+      <div style="background:var(--card2);border-radius:10px;padding:10px;text-align:center">
+        <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Positions</div>
+        <div id="rg-pos-count" style="font-size:16px;font-weight:900;color:var(--text)">—</div>
+        <div id="rg-pos-max" style="font-size:10px;color:var(--text2)">max 3</div>
+      </div>
+    </div>
+    <!-- DD progress bar -->
+    <div style="margin-top:10px">
+      <div style="height:5px;border-radius:3px;background:var(--border);overflow:hidden;position:relative">
+        <div id="rg-dd-bar" style="height:100%;border-radius:3px;background:var(--green);
+          width:0%;transition:width .5s ease,background .3s"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:8px;color:var(--text3);margin-top:3px">
+        <span>0%</span><span id="rg-bar-label">Daily loss used</span><span id="rg-dd-limit-lbl">-5%</span>
+      </div>
     </div>
   </div>
 
@@ -4278,6 +4350,82 @@ function tick() {
   if (countdown <= 0) { countdown = 12; fetchData(); }
 }
 
+/* ── Risk Guard ──────────────────────────────────────── */
+async function fetchRiskGuard() {
+  try {
+    const r = await fetch('/api/risk-guard');
+    if (!r.ok) return;
+    const d = await r.json();
+
+    const tripped    = d.tripped;
+    const pnl        = d.daily_pnl   || 0;
+    const pnlPct     = d.daily_pnl_pct || 0;   // already in %
+    const ddLimit    = d.dd_limit_pct || 5;
+    const openPos    = d.open_positions ?? 0;
+    const maxPos     = d.max_positions  || 3;
+
+    // Status pill
+    const pill = document.getElementById('rg-status-pill');
+    const resetBtn = document.getElementById('rg-reset-btn');
+    if (pill) {
+      if (tripped) {
+        pill.textContent = '⛔ BLOCKED';
+        pill.style.background = 'rgba(255,59,48,.15)';
+        pill.style.color = '#FF3B30';
+      } else if (openPos >= maxPos) {
+        pill.textContent = '⚠ MAX POS';
+        pill.style.background = 'rgba(255,149,0,.15)';
+        pill.style.color = '#FF9500';
+      } else {
+        pill.textContent = 'TRADING OK';
+        pill.style.background = 'rgba(52,199,89,.15)';
+        pill.style.color = '#34C759';
+      }
+    }
+    if (resetBtn) resetBtn.style.display = tripped ? 'block' : 'none';
+
+    // Daily PnL
+    const pnlEl  = document.getElementById('rg-daily-pnl');
+    const pctEl  = document.getElementById('rg-daily-pct');
+    const pnlCol = pnl >= 0 ? 'var(--green)' : 'var(--red)';
+    if (pnlEl) { pnlEl.textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + ' USDT'; pnlEl.style.color = pnlCol; }
+    if (pctEl) { pctEl.textContent = (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%'; pctEl.style.color = pnlCol; }
+
+    // DD Limit
+    const ddEl = document.getElementById('rg-dd-limit');
+    if (ddEl) ddEl.textContent = '-' + ddLimit + '%';
+    const ddLblEl = document.getElementById('rg-dd-limit-lbl');
+    if (ddLblEl) ddLblEl.textContent = '-' + ddLimit + '%';
+
+    // Positions
+    const posEl  = document.getElementById('rg-pos-count');
+    const posMax = document.getElementById('rg-pos-max');
+    if (posEl) { posEl.textContent = openPos + '/' + maxPos; posEl.style.color = openPos >= maxPos ? 'var(--red)' : 'var(--text)'; }
+    if (posMax) posMax.textContent = 'max ' + maxPos;
+
+    // DD bar — how much of the limit has been used
+    const bar = document.getElementById('rg-dd-bar');
+    const barLbl = document.getElementById('rg-bar-label');
+    if (bar) {
+      const usedPct = ddLimit > 0 ? Math.min(100, Math.max(0, (-pnlPct / ddLimit) * 100)) : 0;
+      bar.style.width = usedPct + '%';
+      bar.style.background = usedPct >= 100 ? '#FF3B30' : usedPct >= 70 ? '#FF9500' : '#34C759';
+    }
+    if (barLbl) barLbl.textContent = pnlPct < 0 ? `${(-pnlPct).toFixed(2)}% of ${ddLimit}% limit used` : 'Daily loss used';
+  } catch(e) {}
+}
+
+async function rgReset() {
+  const btn = document.getElementById('rg-reset-btn');
+  if (btn) { btn.disabled = true; btn.textContent = '…'; }
+  try {
+    await fetch('/api/risk-guard/reset', {method:'POST'});
+    toast('Circuit breaker reset — trading resumed', true);
+    fetchRiskGuard();
+  } catch(e) { toast('Reset failed', false); }
+  if (btn) { btn.disabled = false; btn.textContent = 'RESET'; }
+}
+
 /* ── Fear & Greed Index ───────────────────────────────── */
 async function fngRefresh(btn) {
   const icon = document.getElementById('fng-refresh-icon');
@@ -4345,12 +4493,14 @@ loadAccounts();
 loadTicker();
 loadMomentumAlerts();
 fetchFearGreed();
+fetchRiskGuard();
 connectSSE();
 setInterval(tick, 1000);
 setInterval(fetchPositions, 15000);
 setInterval(loadTicker, 60000);
 setInterval(loadMomentumAlerts, 300000);
 setInterval(fetchFearGreed, 300000);
+setInterval(fetchRiskGuard, 30000);
 </script>
 
 <!-- ── Risk Strategy Detail Sheet ── -->

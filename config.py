@@ -73,3 +73,13 @@ AUTO_SL_PCT      = float(os.getenv("AUTO_SL_PCT", "0.03"))
 # Phase 3 (1500+): risk multiplied by 2.5×.
 PHASE_2_EQUITY   = float(os.getenv("PHASE_2_EQUITY", "750"))
 PHASE_3_EQUITY   = float(os.getenv("PHASE_3_EQUITY", "1500"))
+
+# DAILY_DD_LIMIT: fraction of day-start equity — if daily loss exceeds this,
+# the circuit breaker trips and all new signal execution is blocked until
+# manually reset from the dashboard or the next UTC day.
+# e.g. 0.05 = stop trading after losing 5% in one day.
+DAILY_DD_LIMIT     = float(os.getenv("DAILY_DD_LIMIT", "0.05"))
+
+# MAX_OPEN_POSITIONS: hard cap on concurrent open positions across the primary
+# account. Signals are skipped (not queued) when this limit is reached.
+MAX_OPEN_POSITIONS = int(os.getenv("MAX_OPEN_POSITIONS", "3"))
