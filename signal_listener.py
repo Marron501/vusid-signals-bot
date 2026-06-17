@@ -663,12 +663,26 @@ class DiscordSignalClient(discord.Client):
                     except Exception as _ae:
                         logger.warning(f"[AI] analysis skipped: {_ae}")
 
-                # ── Score gate ────────────────────────────────────────────
+                # ── Score gate (phase-aware) ──────────────────────────────
                 if signal["action"] == "open" and config.MIN_AI_SCORE > 0 and analysis:
                     score = analysis.get("score", 0)
-                    if score < config.MIN_AI_SCORE:
+                    # Raise the gate in higher phases to match the risk increase
+                    try:
+                        eq_f = float(self.signal_executor.executor.get_equity())
+                    except Exception:
+                        eq_f = 0.0
+                    if eq_f >= config.PHASE_3_EQUITY:
+                        effective_gate = max(config.MIN_AI_SCORE, 70)
+                        phase_label    = "Phase 3"
+                    elif eq_f >= config.PHASE_2_EQUITY:
+                        effective_gate = max(config.MIN_AI_SCORE, 65)
+                        phase_label    = "Phase 2"
+                    else:
+                        effective_gate = config.MIN_AI_SCORE
+                        phase_label    = "Phase 1"
+                    if score < effective_gate:
                         reason = (
-                            f"AI score {score}/100 below threshold {config.MIN_AI_SCORE} "
+                            f"AI score {score}/100 below {phase_label} threshold {effective_gate} "
                             f"— verdict: {analysis.get('verdict','?')} | {analysis.get('recommendation','?')}"
                         )
                         log_entry["reason"] = reason
@@ -680,7 +694,7 @@ class DiscordSignalClient(discord.Client):
                             f"🧠 **Signal FILTERED by AI Score**\n"
                             f"────────────────────\n"
                             f"Symbol: **{signal.get('side','')} {signal.get('symbol','')}**\n"
-                            f"Score: `{score}/100` (need ≥ {config.MIN_AI_SCORE})\n"
+                            f"Score: `{score}/100` (need ≥ {effective_gate} in {phase_label})\n"
                             f"Verdict: `{analysis.get('verdict','?')}`\n"
                             f"Reason: {analysis.get('summary','')[:120]}"
                         )
