@@ -1246,7 +1246,7 @@ button,input,select{font-family:inherit}
   padding-bottom:env(safe-area-inset-bottom,0px);
   display:flex;overflow-x:auto;overflow-y:hidden;
   scrollbar-width:none;-webkit-overflow-scrolling:touch;
-  box-shadow:0 -2px 16px rgba(0,122,255,.06)}
+  box-shadow:0 -2px 16px rgba(34,211,238,.06)}
 .nav::-webkit-scrollbar{display:none}
 .nav-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:2px;padding:7px 4px;border:none;background:none;color:var(--text3);
@@ -1273,7 +1273,7 @@ button,input,select{font-family:inherit}
   color:var(--text3);margin-bottom:12px;display:flex;align-items:center;gap:6px}
 .card-label svg{width:13px;height:13px;stroke-width:2}
 .top-stripe{position:absolute;top:0;left:0;right:0;height:3px;
-  background:linear-gradient(90deg,#007AFF,#5AC8FA)}
+  background:linear-gradient(90deg,#22d3ee,#38bdf8)}
 
 /* ── HERO BALANCE ────────────────────────────────────── */
 .hero{background:linear-gradient(160deg,#101a36 0%,#0a1124 100%);
@@ -1315,7 +1315,7 @@ button,input,select{font-family:inherit}
 .wr-fail{background:var(--redbg);color:var(--red);border:1px solid var(--redb)}
 .bar-track{background:var(--card2);border-radius:8px;height:7px;overflow:hidden;border:1px solid var(--border)}
 .bar-fill{height:100%;border-radius:8px;
-  background:linear-gradient(90deg,#007AFF,#5AC8FA);
+  background:linear-gradient(90deg,#22d3ee,#38bdf8);
   transition:width .8s cubic-bezier(.4,0,.2,1)}
 
 /* ── POSITIONS ───────────────────────────────────────── */
@@ -1379,7 +1379,7 @@ button,input,select{font-family:inherit}
   border-radius:24px 24px 0 0;padding:20px;width:100%;max-height:90dvh;overflow-y:auto;
   padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));
   animation:slideup .25s cubic-bezier(.4,0,.2,1);
-  box-shadow:0 -8px 40px rgba(0,122,255,.12);
+  box-shadow:0 -8px 40px rgba(34,211,238,.12);
   backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .cs-handle{width:40px;height:4px;background:var(--border2);border-radius:4px;margin:0 auto 18px}
 .cs-stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:14px 0}
@@ -1457,7 +1457,7 @@ button,input,select{font-family:inherit}
   cursor:pointer;transition:.3s;border:1px solid var(--border)}
 .sw-track::before{content:'';position:absolute;width:20px;height:20px;
   left:2px;top:2px;background:var(--text3);border-radius:50%;transition:.3s}
-input:checked+.sw-track{background:#007AFF;border-color:#007AFF}
+input:checked+.sw-track{background:var(--accent);border-color:var(--accent)}
 input:checked+.sw-track::before{transform:translateX(22px);background:#FFFFFF}
 .inp-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
 .inp-full{grid-column:1/-1}
@@ -1466,14 +1466,15 @@ input:checked+.sw-track::before{transform:translateX(22px);background:#FFFFFF}
 .inp{width:100%;background:var(--input-bg);border:1px solid var(--border);border-radius:11px;
   padding:12px 14px;color:var(--text);font-size:14px;font-weight:700;
   -webkit-appearance:none;transition:all .2s}
-.inp:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba(0,122,255,0.15)}
+.inp:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba(34,211,238,0.15)}
 select.inp option{background:var(--card);color:var(--text)}
 .btn{width:100%;padding:15px;border:none;border-radius:13px;font-size:14px;
   font-weight:800;cursor:pointer;transition:all .15s;display:flex;
   align-items:center;justify-content:center;gap:8px}
 .btn:active{transform:scale(.97);opacity:.88}
 .btn svg{width:16px;height:16px;stroke-width:2.2}
-.btn-primary{background:rgba(0,122,255,0.95);color:#fff;box-shadow:0 4px 20px rgba(0,122,255,0.4)}
+.btn-primary{background:linear-gradient(135deg,#22d3ee,#0e9bb8);color:#04141a;
+  box-shadow:0 4px 20px rgba(34,211,238,0.32)}
 .btn-green{background:var(--greenbg);color:var(--green);border:1px solid var(--greenb)}
 .btn-red{background:var(--redbg);color:var(--red);border:1px solid var(--redb)}
 .btn-ghost{background:var(--card);color:var(--text2);border:1px solid var(--border)}
@@ -1665,7 +1666,7 @@ select.inp option{background:var(--card);color:var(--text)}
 /* account panel tabs */
 .ad-tab{flex:1;background:none;border:none;cursor:pointer;padding:7px 4px;border-radius:8px;
   font-size:12px;font-weight:700;color:var(--text3);transition:all .15s}
-.ad-tab.active{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(0,122,255,0.3)}
+.ad-tab.active{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(34,211,238,0.3)}
 /* full position cards in account panel */
 .adp-card{background:var(--card2);border:1px solid var(--border);border-radius:12px;
   padding:12px;margin-bottom:10px;
@@ -1752,7 +1753,7 @@ select.inp option{background:var(--card);color:var(--text)}
   border-radius:28px 28px 0 0;width:100%;max-height:92dvh;overflow-y:auto;
   padding:20px;padding-bottom:calc(24px + env(safe-area-inset-bottom,0px));
   animation:slideup .28s cubic-bezier(.4,0,.2,1);
-  box-shadow:0 -8px 48px rgba(0,122,255,.15);
+  box-shadow:0 -8px 48px rgba(34,211,238,.15);
   backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur)}
 .sa-hero{display:flex;align-items:center;gap:16px;margin-bottom:18px;padding-bottom:16px;
   border-bottom:1px solid var(--border)}
@@ -5019,10 +5020,10 @@ function openPhaseDetail(n) {
     },
     2: {
       title:'Growth', subtitle:'Compound aggressively but stay disciplined.',
-      color:'linear-gradient(135deg,#007AFF,#5E5CE6)',
+      color:'linear-gradient(135deg,#22d3ee,#818cf8)',
       multLabel:'1.5×', mult:1.5,
       rangeStart:p2, rangeEnd:p3,
-      color_hex:'#007AFF',
+      color_hex:'#22d3ee',
       rules:[
         {icon:'📈', text:'Risk increases to ' + (risk*1.5).toFixed(1) + '% per trade — 1.5× base. Position sizes are now noticeably larger.'},
         {icon:'🎯', text:'Raise your score gate to 65+. More capital on the line means you can afford to be pickier.'},
@@ -5815,20 +5816,20 @@ function _drawEquityCurve(curve, startEq) {
       <!-- Phase 2 -->
       <div id="rd-phase2" onclick="openPhaseDetail(2)"
         class="sa-meta-box" style="display:flex;align-items:center;gap:10px;padding:14px;
-        cursor:pointer;transition:all .15s;border:1px solid rgba(0,122,255,.2)">
+        cursor:pointer;transition:all .15s;border:1px solid rgba(34,211,238,.2)">
         <div style="width:38px;height:38px;border-radius:12px;
-          background:linear-gradient(135deg,rgba(0,122,255,.25),rgba(0,122,255,.1));
+          background:linear-gradient(135deg,rgba(34,211,238,.25),rgba(34,211,238,.1));
           display:flex;align-items:center;justify-content:center;flex-shrink:0;
-          font-size:18px;font-weight:900;color:#007AFF">2</div>
+          font-size:18px;font-weight:900;color:var(--accent)">2</div>
         <div style="flex:1">
           <div style="font-size:13px;font-weight:800">Phase 2 — Growth</div>
           <div style="font-size:10px;color:var(--text3);margin-top:3px">
             <span id="rd-p2thresh2">$750</span> → <span id="rd-p3thresh">$1500</span>
-            &nbsp;·&nbsp; Risk: <span id="rd-p2risk" style="color:#007AFF;font-weight:700">3%</span>
+            &nbsp;·&nbsp; Risk: <span id="rd-p2risk" style="color:var(--accent);font-weight:700">3%</span>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:6px">
-          <div id="rd-p2-active" style="display:none;width:8px;height:8px;border-radius:50%;background:#007AFF"></div>
+          <div id="rd-p2-active" style="display:none;width:8px;height:8px;border-radius:50%;background:var(--accent)"></div>
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="var(--text3)" stroke-width="2.5">
             <polyline points="9 18 15 12 9 6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
