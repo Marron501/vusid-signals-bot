@@ -1234,12 +1234,15 @@ button,input,select{font-family:inherit}
   background:var(--nav-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);
   border-top:1px solid var(--border);
   padding-bottom:env(safe-area-inset-bottom,0px);
-  display:grid;grid-template-columns:repeat(6,1fr);
+  display:flex;overflow-x:auto;overflow-y:hidden;
+  scrollbar-width:none;-webkit-overflow-scrolling:touch;
   box-shadow:0 -2px 16px rgba(0,122,255,.06)}
+.nav::-webkit-scrollbar{display:none}
 .nav-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;
-  gap:2px;padding:7px 2px;border:none;background:none;color:var(--text3);
+  gap:2px;padding:7px 4px;border:none;background:none;color:var(--text3);
   cursor:pointer;font-size:8px;font-weight:700;letter-spacing:.3px;
-  text-transform:uppercase;transition:color .2s;position:relative;min-height:54px}
+  text-transform:uppercase;transition:color .2s;position:relative;
+  min-height:54px;min-width:56px;flex:1 0 56px}
 .nav-btn.active{color:#007AFF}
 .nav-btn svg{width:19px;height:19px;stroke-width:1.8;transition:transform .2s}
 .nav-btn.active svg{transform:translateY(-1px)}
@@ -1474,16 +1477,20 @@ select.inp option{background:var(--card);color:var(--text)}
 
 /* ── LOG ─────────────────────────────────────────────── */
 .log-box{background:var(--input-bg);border:1px solid var(--border);border-radius:12px;
-  padding:12px;max-height:calc(100dvh - 280px);overflow-y:auto}
-.log-line{font-size:9.5px;font-family:'SF Mono','Fira Code',monospace;
-  padding:2px 0;line-height:1.6;color:var(--text3);word-break:break-all}
+  padding:12px;max-height:calc(100dvh - 260px);overflow-y:auto;
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.log-line{font-size:11px;font-family:'SF Mono','Fira Code',monospace;
+  padding:3px 0;line-height:1.55;color:var(--text3);word-break:break-all}
 .log-line.err{color:var(--red)}.log-line.warn{color:var(--yellow)}
 .log-line.good{color:var(--green)}.log-line.info{color:var(--accent2)}
 .log-line.sig{color:var(--cyan);font-weight:700}
-.fpills{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px}
-.fpill{padding:6px 13px;border-radius:20px;font-size:10.5px;font-weight:700;
+.fpills{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none}
+.fpills::-webkit-scrollbar{display:none}
+.fpill{padding:8px 14px;border-radius:20px;font-size:11px;font-weight:700;
   border:1px solid var(--border);background:var(--card);color:var(--text3);
-  cursor:pointer;white-space:nowrap;transition:all .2s}
+  cursor:pointer;white-space:nowrap;transition:all .2s;min-height:36px;
+  display:inline-flex;align-items:center}
 .fpill.active{background:var(--accentbg);color:var(--accent2);border-color:var(--accentbrd)}
 
 /* ── MODAL ───────────────────────────────────────────── */
