@@ -113,6 +113,26 @@ def get_enabled_accounts() -> list[dict]:
     ]
 
 
+def migrate_testnet_to_demo() -> None:
+    """
+    One-time migration: the old 'testnet' flag meant Bybit Demo Trading (demo=True
+    in pybit). Now that we have separate testnet/demo flags, any existing account
+    with testnet=True and no explicit 'demo' key is a Demo account, not a real
+    Bybit Testnet account.
+    """
+    with _lock:
+        accounts = load_accounts()
+        changed = False
+        for a in accounts:
+            if a.get("testnet") and "demo" not in a:
+                a["demo"]    = True
+                a["testnet"] = False
+                changed = True
+                logger.info(f"[accounts] Migrated '{a['name']}' testnet→demo")
+        if changed:
+            _save(accounts)
+
+
 # ── Per-account executor ──────────────────────────────────────────────────────
 
 def get_executor(account: dict):

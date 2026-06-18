@@ -5164,6 +5164,8 @@ setInterval(fetchRiskGuard, 30000);
 
 
 if __name__ == "__main__":
+    from accounts_manager import migrate_testnet_to_demo
+    migrate_testnet_to_demo()
     port = int(os.environ.get("PORT", os.environ.get("DASHBOARD_PORT", 8080)))
     print(f"\n  Prolific -> http://0.0.0.0:{port}\n")
     app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)

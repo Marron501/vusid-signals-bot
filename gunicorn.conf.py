@@ -9,3 +9,12 @@ worker_class = "gthread"
 accesslog = "-"
 errorlog = "-"
 loglevel = "info"
+
+
+def on_starting(server):
+    """Run one-time migrations before workers start."""
+    try:
+        from accounts_manager import migrate_testnet_to_demo
+        migrate_testnet_to_demo()
+    except Exception as e:
+        print(f"[startup] migration error: {e}")
