@@ -1476,15 +1476,10 @@ select.inp option{background:var(--card);color:var(--text)}
 .info-val{font-size:12.5px;font-weight:700}
 
 /* ── LOG ─────────────────────────────────────────────── */
-/* Logs page gets its own scroll context so the log-box is the sole
-   scroll container — avoids nested-scroll touch issues on iOS */
-#page-logs.active{overflow:hidden;display:flex;flex-direction:column}
-#page-logs .pad{display:flex;flex-direction:column;flex:1;min-height:0;
-  padding:14px 14px calc(68px + env(safe-area-inset-bottom,0px))}
-#page-logs .card.mb{flex-shrink:0}
+/* No custom scroll container — the .page itself scrolls, exactly like
+   every other page. log-box just flows naturally inside it. */
 .log-box{background:var(--input-bg);border:1px solid var(--border);border-radius:12px;
-  padding:12px;flex:1;min-height:0;overflow-y:auto;
-  -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  padding:12px}
 .log-line{font-size:11px;font-family:'SF Mono','Fira Code',monospace;
   padding:3px 0;line-height:1.55;color:var(--text3);word-break:break-all}
 .log-line.err{color:var(--red)}.log-line.warn{color:var(--yellow)}
@@ -4177,7 +4172,8 @@ function renderLogs(f) {
   const lines = filters[f] ? allLogs.filter(filters[f]) : allLogs;
   const lb = document.getElementById('log-box');
   if (!lines.length) { lb.innerHTML = '<div class="log-line" style="color:var(--text3)">No entries match</div>'; return; }
-  lb.innerHTML = lines.map(l => {
+  // Newest first so the latest activity is visible immediately without scrolling
+  lb.innerHTML = lines.slice().reverse().map(l => {
     let cls = 'log-line';
     if (l.includes('ERROR')||l.includes('FAIL')||l.includes('❌')) cls += ' err';
     else if (l.includes('WARN')||l.includes('SKIP')) cls += ' warn';
@@ -4186,7 +4182,6 @@ function renderLogs(f) {
     else if (l.includes('INFO')) cls += ' info';
     return `<div class="${cls}">${l.replace(/</g,'&lt;')}</div>`;
   }).join('');
-  lb.scrollTop = lb.scrollHeight;
 }
 
 /* ── Accounts ────────────────────────────────────────── */
