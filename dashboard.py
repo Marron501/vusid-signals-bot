@@ -663,6 +663,52 @@ def api_close():
         return jsonify({"success": False, "error": str(e)})
 
 
+@app.route("/api/close-partial", methods=["POST"])
+def api_close_partial():
+    from decimal import Decimal, ROUND_DOWN
+    d      = request.get_json() or {}
+    sym    = d.get("symbol", "").upper().strip()
+    side   = d.get("side")
+    pct    = float(d.get("pct", 100))
+    acc_id = d.get("account_id")
+    if not sym: return jsonify({"success": False, "error": "Symbol required"})
+    if not sym.endswith("USDT"): sym += "USDT"
+    if not (0 < pct <= 100): return jsonify({"success": False, "error": "pct must be 1-100"})
+    try:
+        if acc_id:
+            from accounts_manager import load_accounts, get_executor
+            accs = load_accounts()
+            acc  = next((a for a in accs if a["id"] == acc_id), None)
+            if not acc: return jsonify({"success": False, "error": "Account not found"})
+            ex = get_executor(acc)
+        else:
+            from trade_executor import TradeExecutor
+            ex = TradeExecutor()
+        positions = ex.get_my_positions()
+        pos = None
+        for _, p in positions.items():
+            if p["symbol"] == sym and (not side or p["side"] == side):
+                pos = p; break
+        if not pos:
+            return jsonify({"success": False, "error": "Position not found"})
+        full_size  = Decimal(str(pos["size"]))
+        inst       = ex.instruments.get(sym, {})
+        step       = inst.get("qty_step", Decimal("0.001"))
+        close_size = (full_size * Decimal(str(pct)) / 100 // step) * step
+        if close_size <= 0:
+            return jsonify({"success": False, "error": "Qty too small after rounding"})
+        close_side = "Sell" if pos["side"] == "Buy" else "Buy"
+        from trade_executor import CATEGORY
+        ex.client.place_order(
+            category=CATEGORY, symbol=sym, side=close_side,
+            orderType="Market", qty=str(close_size),
+            positionIdx=config.POSITION_MODE, reduceOnly=True,
+        )
+        return jsonify({"success": True, "symbol": sym, "qty": str(close_size), "pct": pct})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
 @app.route("/api/close-all", methods=["POST"])
 def api_close_all():
     d      = request.get_json() or {}
@@ -686,6 +732,25 @@ def api_close_all():
 
 _mkt_cache = {"data": [], "ts": 0}
 _fng_cache = {"data": None, "ts": 0}
+
+_mark_cache: dict = {}
+
+@app.route("/api/mark-price/<symbol>")
+def api_mark_price(symbol):
+    sym = symbol.upper().strip()
+    if not sym.endswith("USDT"): sym += "USDT"
+    import time as _t
+    cached = _mark_cache.get(sym)
+    if cached and _t.time() - cached["ts"] < 10:
+        return jsonify({"symbol": sym, "price": cached["price"]})
+    try:
+        from trade_executor import TradeExecutor
+        ex    = TradeExecutor()
+        price = float(ex.get_mark_price(sym))
+        _mark_cache[sym] = {"price": price, "ts": _t.time()}
+        return jsonify({"symbol": sym, "price": price})
+    except Exception as e:
+        return jsonify({"symbol": sym, "price": None, "error": str(e)})
 
 @app.route("/api/market-ticker")
 def api_market_ticker():
@@ -2227,7 +2292,8 @@ select.inp option{background:var(--card);color:var(--text)}
               background:var(--card2);color:var(--text2);border:1px solid var(--border)">%</button>
           </div>
         </div>
-        <input class="inp" id="ts-sl" placeholder="auto" step="any" type="number">
+        <input class="inp" id="ts-sl" placeholder="auto" step="any" type="number" oninput="updateRRHint('ts')">
+        <div id="ts-sl-hint" style="font-size:10px;margin-top:3px;min-height:14px;color:var(--red)"></div>
       </div>
       <div class="inp-wrap">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
@@ -2241,7 +2307,19 @@ select.inp option{background:var(--card);color:var(--text)}
               background:var(--card2);color:var(--text2);border:1px solid var(--border)">%</button>
           </div>
         </div>
-        <input class="inp" id="ts-tp" placeholder="optional" step="any" type="number">
+        <input class="inp" id="ts-tp" placeholder="optional" step="any" type="number" oninput="updateRRHint('ts')">
+        <div id="ts-tp-hint" style="font-size:10px;margin-top:3px;min-height:14px;color:var(--green)"></div>
+      </div>
+    </div>
+    <div id="ts-rr-bar" style="display:none;background:var(--card2);border:1px solid var(--border);border-radius:9px;padding:8px 12px;margin-bottom:8px;font-size:11px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--text3)">Max loss (SL)</span><span id="ts-rr-loss" style="color:var(--red);font-weight:800">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+        <span style="color:var(--text3)">Target gain (TP)</span><span id="ts-rr-gain" style="color:var(--green);font-weight:800">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px">
+        <span style="color:var(--text3)">Risk : Reward</span><span id="ts-rr-ratio" style="font-weight:800">—</span>
       </div>
     </div>
     <button class="btn btn-green" onclick="sendTestSignal()" style="margin-bottom:6px">
@@ -2389,9 +2467,20 @@ select.inp option{background:var(--card);color:var(--text)}
     <div id="cs-demo-note" class="cs-demo-note" style="display:none">
       🎮 <strong>Demo position</strong> — no real funds at risk
     </div>
-    <div class="cs-warn">
-      ⚠️ Closes immediately at market price. Cannot be undone.
+
+    <!-- Partial close selector -->
+    <div style="margin:12px 0">
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.8px;color:var(--text3);margin-bottom:7px">Close Portion</div>
+      <div style="display:flex;gap:6px;margin-bottom:7px">
+        <button class="btn btn-ghost btn-sm" id="cs-pct-25"  onclick="setClosePct(25)"  style="flex:1">25%</button>
+        <button class="btn btn-ghost btn-sm" id="cs-pct-50"  onclick="setClosePct(50)"  style="flex:1">50%</button>
+        <button class="btn btn-ghost btn-sm" id="cs-pct-75"  onclick="setClosePct(75)"  style="flex:1">75%</button>
+        <button class="btn btn-primary btn-sm" id="cs-pct-100" onclick="setClosePct(100)" style="flex:1">100%</button>
+      </div>
+      <div style="font-size:11px;color:var(--text3);text-align:center;padding:5px;background:var(--card2);border-radius:7px" id="cs-pct-hint">Closing full position</div>
     </div>
+
+    <div class="cs-warn">⚠️ Closes at market price. Cannot be undone.</div>
     <button class="btn btn-red" id="cs-confirm-btn" onclick="confirmClose()">
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10" stroke-linecap="round" stroke-linejoin="round"/><line x1="15" y1="9" x2="9" y2="15" stroke-linecap="round" stroke-linejoin="round"/><line x1="9" y1="9" x2="15" y2="15" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Close Position
@@ -2588,7 +2677,7 @@ select.inp option{background:var(--card);color:var(--text)}
                 background:var(--card2);color:var(--text2);border:1px solid var(--border)">%</button>
             </div>
           </div>
-          <input class="inp" type="number" id="ad-sl" placeholder="0.0000" step="any">
+          <input class="inp" type="number" id="ad-sl" placeholder="0.0000" step="any" oninput="updateRRHint('ad')">
         </div>
         <div class="inp-wrap">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
@@ -2602,7 +2691,7 @@ select.inp option{background:var(--card);color:var(--text)}
                 background:var(--card2);color:var(--text2);border:1px solid var(--border)">%</button>
             </div>
           </div>
-          <input class="inp" type="number" id="ad-tp" placeholder="0.0000" step="any">
+          <input class="inp" type="number" id="ad-tp" placeholder="0.0000" step="any" oninput="updateRRHint('ad')">
         </div>
       </div>
       <div id="ad-trade-preview" style="background:var(--card2);border:1px solid var(--border);
@@ -2613,8 +2702,14 @@ select.inp option{background:var(--card);color:var(--text)}
         <div style="display:flex;justify-content:space-between;margin-bottom:4px">
           <span style="color:var(--text3)">Position notional</span><span id="ad-prev-notional" style="font-weight:800">—</span>
         </div>
-        <div style="display:flex;justify-content:space-between">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
           <span style="color:var(--text3)">Max loss (SL hit)</span><span id="ad-prev-loss" style="font-weight:800;color:var(--red)">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px" id="ad-prev-gain-row" style="display:none">
+          <span style="color:var(--text3)">Target gain (TP hit)</span><span id="ad-prev-gain" style="font-weight:800;color:var(--green)">—</span>
+        </div>
+        <div style="display:flex;justify-content:space-between" id="ad-prev-rr-row" style="display:none">
+          <span style="color:var(--text3)">Risk : Reward</span><span id="ad-prev-rr" style="font-weight:800">—</span>
         </div>
       </div>
       <div class="btn-grid">
@@ -3002,6 +3097,8 @@ function closePosition(idx) {
   const p = _visiblePos()[idx];
   if (!p) return;
   _closePending = {...p, _idx: idx};
+  _closePct = 100;
+  setClosePct(100);
   // populate sheet
   document.getElementById('cs-symbol').textContent  = p.symbol;
   const sc = p.side === 'Buy' ? 'long' : 'short';
@@ -3032,34 +3129,140 @@ function closePosition(idx) {
 function cancelClose() {
   document.getElementById('cs-overlay').classList.remove('open');
   _closePending = null;
+  _closePct = 100;
+}
+
+let _closePct = 100;
+function setClosePct(pct) {
+  _closePct = pct;
+  [25,50,75,100].forEach(p => {
+    const b = document.getElementById('cs-pct-'+p);
+    if (!b) return;
+    b.classList.toggle('btn-primary', p === pct);
+    b.classList.toggle('btn-ghost',   p !== pct);
+  });
+  const p    = _closePending;
+  const size = p ? parseFloat(p.size) : 0;
+  const qty  = size ? (size * pct / 100).toFixed(4) : '—';
+  document.getElementById('cs-pct-hint').textContent =
+    pct === 100 ? 'Closing full position' : `Closing ${pct}% — ${qty} contracts`;
+  const btn = document.getElementById('cs-confirm-btn');
+  if (btn) btn.innerHTML = `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px;stroke-width:2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15" stroke-linecap="round"/><line x1="9" y1="9" x2="15" y2="15" stroke-linecap="round"/></svg> ${pct < 100 ? 'Partial Close '+pct+'%' : 'Close Position'}`;
 }
 
 async function confirmClose() {
   if (!_closePending) return;
   const p   = _closePending;
+  const pct = _closePct || 100;
   const btn = document.getElementById('cs-confirm-btn');
   btn.disabled = true;
   btn.innerHTML = '⏳ Closing…';
   try {
-    const body = {symbol: p.symbol, side: p.side};
+    const body = {symbol: p.symbol, side: p.side, pct};
     if (p.account_id && p.account_id !== 'primary') body.account_id = p.account_id;
-    const r = await fetch('/api/close', {
-      method: 'POST', headers: {'Content-Type':'application/json'},
-      body: JSON.stringify(body)
-    });
-    const d = await r.json();
+    const url = pct < 100 ? '/api/close-partial' : '/api/close';
+    const r   = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const d   = await r.json();
     cancelClose();
     if (d.success) {
-      toast(`✅ Closed ${p.symbol}${p.is_demo ? ' (Demo)' : ''}`);
-      // optimistically remove from local state
-      _allPositions = _allPositions.filter(x =>
-        !(x.symbol === p.symbol && x.account_id === p.account_id && x.side === p.side));
-      renderPositionCards();
+      const label = pct < 100 ? `${pct}% of ${p.symbol}` : p.symbol;
+      toast(`✅ Closed ${label}${p.is_demo ? ' (Demo)' : ''}`);
+      if (pct >= 100) {
+        _allPositions = _allPositions.filter(x =>
+          !(x.symbol === p.symbol && x.account_id === p.account_id && x.side === p.side));
+        renderPositionCards();
+      }
       countdown = 4;
     } else {
       toast('❌ ' + (d.error || 'Close failed'), false);
     }
   } catch(e) { cancelClose(); toast('❌ Network error', false); }
+}
+
+/* ── R:R Preview ─────────────────────────────────────── */
+const _markPriceCache = {};
+
+async function _fetchMark(sym) {
+  const s = sym.toUpperCase().replace('USDT','') + 'USDT';
+  const c = _markPriceCache[s];
+  if (c && Date.now() - c.ts < 15000) return c.price;
+  try {
+    const r = await fetch('/api/mark-price/'+s);
+    const d = await r.json();
+    if (d.price) { _markPriceCache[s] = {price: d.price, ts: Date.now()}; return d.price; }
+  } catch(_) {}
+  return null;
+}
+
+function _calcRR(slInp, tpInp, markPrice) {
+  const eq = DATA?.account?.equity || 0;
+  if (!eq) return null;
+  const p2       = DATA?.phase_2_equity || 100000;
+  const p3       = DATA?.phase_3_equity || 150000;
+  const baseRisk = (parseFloat(document.getElementById('inp-risk')?.value) || 2) / 100;
+  const mult     = eq >= p3 ? 2.5 : eq >= p2 ? 1.5 : 1.0;
+  const riskAmt  = eq * baseRisk * mult;
+
+  const slMode = slInp?.dataset?.mode || 'price';
+  const tpMode = tpInp?.dataset?.mode || 'price';
+  const slVal  = parseFloat(slInp?.value);
+  const tpVal  = parseFloat(tpInp?.value);
+
+  let slDist = null, tpDist = null;
+  if (slMode === 'pct' && slVal > 0) {
+    slDist = slVal / 100;
+  } else if (slMode === 'price' && slVal > 0 && markPrice) {
+    slDist = Math.abs(markPrice - slVal) / markPrice;
+  }
+  if (tpMode === 'pct' && tpVal > 0) {
+    tpDist = tpVal / 100;
+  } else if (tpMode === 'price' && tpVal > 0 && markPrice) {
+    tpDist = Math.abs(markPrice - tpVal) / markPrice;
+  }
+
+  if (!slDist) slDist = (parseFloat(document.getElementById('inp-sl')?.value) || 3) / 100;
+  const loss = riskAmt;
+  const gain = tpDist ? riskAmt * (tpDist / slDist) : null;
+  const rr   = tpDist ? tpDist / slDist : null;
+  return { loss, gain, rr, riskAmt };
+}
+
+function _fmt$(v) { return '$' + Math.abs(v).toLocaleString('en',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+async function updateRRHint(prefix) {
+  const sym   = document.getElementById(prefix === 'ts' ? 'ts-sym' : 'ad-sym')?.value?.trim() || 'BTC';
+  const mark  = await _fetchMark(sym);
+  const slInp = document.getElementById(prefix+'-sl');
+  const tpInp = document.getElementById(prefix+'-tp');
+  const rr    = _calcRR(slInp, tpInp, mark);
+
+  if (prefix === 'ts') {
+    const lossEl  = document.getElementById('ts-rr-loss');
+    const gainEl  = document.getElementById('ts-rr-gain');
+    const ratioEl = document.getElementById('ts-rr-ratio');
+    const bar     = document.getElementById('ts-rr-bar');
+    if (!rr) { if (bar) bar.style.display = 'none'; return; }
+    if (bar) bar.style.display = 'block';
+    if (lossEl)  lossEl.textContent  = '-' + _fmt$(rr.loss);
+    if (gainEl)  gainEl.textContent  = rr.gain != null ? '+' + _fmt$(rr.gain) : '—';
+    if (ratioEl) ratioEl.textContent = rr.rr   != null ? '1 : ' + rr.rr.toFixed(2) : '—';
+    if (ratioEl) ratioEl.style.color = rr.rr >= 2 ? 'var(--green)' : rr.rr >= 1 ? 'var(--yellow,#f59e0b)' : 'var(--red)';
+  } else {
+    const prev = document.getElementById('ad-trade-preview');
+    if (!prev || !rr) return;
+    prev.style.display = 'block';
+    const gainRow = document.getElementById('ad-prev-gain-row');
+    const rrRow   = document.getElementById('ad-prev-rr-row');
+    const gainEl  = document.getElementById('ad-prev-gain');
+    const rrEl    = document.getElementById('ad-prev-rr');
+    if (gainRow) gainRow.style.display = rr.gain != null ? 'flex' : 'none';
+    if (rrRow)   rrRow.style.display   = rr.rr   != null ? 'flex' : 'none';
+    if (gainEl)  gainEl.textContent    = rr.gain != null ? '+' + _fmt$(rr.gain) : '—';
+    if (rrEl)    rrEl.textContent      = rr.rr   != null ? '1 : ' + rr.rr.toFixed(2) : '—';
+    if (rrEl)    rrEl.style.color      = rr.rr >= 2 ? 'var(--green)' : rr.rr >= 1 ? 'var(--yellow,#f59e0b)' : 'var(--red)';
+    const lossEl = document.getElementById('ad-prev-loss');
+    if (lossEl)  lossEl.textContent = '-' + _fmt$(rr.loss);
+  }
 }
 
 /* ── SL / TP ─────────────────────────────────────────── */
@@ -4630,10 +4833,10 @@ function _slTpToggle(priceBtn, pctBtn, inp, mode) {
   inp.dataset.mode = mode;
   inp.value = '';
 }
-function adSlMode(m)  { _slTpToggle(document.getElementById('ad-sl-mode-price'), document.getElementById('ad-sl-mode-pct'), document.getElementById('ad-sl'), m); }
-function adTpMode(m)  { _slTpToggle(document.getElementById('ad-tp-mode-price'), document.getElementById('ad-tp-mode-pct'), document.getElementById('ad-tp'), m); }
-function tsSlMode(m)  { _slTpToggle(document.getElementById('ts-sl-mode-price'), document.getElementById('ts-sl-mode-pct'), document.getElementById('ts-sl'), m); }
-function tsTpMode(m)  { _slTpToggle(document.getElementById('ts-tp-mode-price'), document.getElementById('ts-tp-mode-pct'), document.getElementById('ts-tp'), m); }
+function adSlMode(m)  { _slTpToggle(document.getElementById('ad-sl-mode-price'), document.getElementById('ad-sl-mode-pct'), document.getElementById('ad-sl'), m); updateRRHint('ad'); }
+function adTpMode(m)  { _slTpToggle(document.getElementById('ad-tp-mode-price'), document.getElementById('ad-tp-mode-pct'), document.getElementById('ad-tp'), m); updateRRHint('ad'); }
+function tsSlMode(m)  { _slTpToggle(document.getElementById('ts-sl-mode-price'), document.getElementById('ts-sl-mode-pct'), document.getElementById('ts-sl'), m); updateRRHint('ts'); }
+function tsTpMode(m)  { _slTpToggle(document.getElementById('ts-tp-mode-price'), document.getElementById('ts-tp-mode-pct'), document.getElementById('ts-tp'), m); updateRRHint('ts'); }
 function acccSlMode(id, m) { _slTpToggle(document.getElementById('accc-sl-mode-price-'+id), document.getElementById('accc-sl-mode-pct-'+id), document.getElementById('accc-slp-'+id), m); }
 function acccTpMode(id, m) { _slTpToggle(document.getElementById('accc-tp-mode-price-'+id), document.getElementById('accc-tp-mode-pct-'+id), document.getElementById('accc-tp-'+id), m); }
 
