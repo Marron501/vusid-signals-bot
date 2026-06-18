@@ -1092,7 +1092,7 @@ def api_positions():
 # ── HTML ──────────────────────────────────────────────────────────────────────
 
 HTML = r"""<!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en" data-theme="dark">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
@@ -1104,39 +1104,40 @@ HTML = r"""<!DOCTYPE html>
 /* ── TOKENS — iOS GLASS ──────────────────────────────── */
 /* Dark — iOS glass */
 :root[data-theme="dark"]{
-  --bg:#000000;
-  --surface:rgba(28,28,30,0.95);
-  --card:rgba(28,28,30,0.72);
-  --card2:rgba(44,44,46,0.65);
-  --card3:rgba(58,58,60,0.55);
-  --border:rgba(255,255,255,0.1);
-  --border2:rgba(255,255,255,0.18);
-  --accent:#007AFF;
-  --accent2:#409CFF;
-  --accentbg:rgba(0,122,255,0.12);
-  --accentbrd:rgba(0,122,255,0.35);
-  --cyan:#5AC8FA;
-  --cyanbg:rgba(90,200,250,0.1);
-  --indigo:#5E5CE6;
-  --indigobg:rgba(94,92,230,0.1);
-  --green:#34C759;
-  --greenbg:rgba(52,199,89,0.1);
-  --greenb:rgba(52,199,89,0.3);
-  --red:#FF3B30;
-  --redbg:rgba(255,59,48,0.1);
-  --redb:rgba(255,59,48,0.3);
-  --yellow:#FFD60A;
-  --yellowbg:rgba(255,214,10,0.1);
-  --text:#FFFFFF;
-  --text2:rgba(235,235,245,0.6);
-  --text3:rgba(235,235,245,0.3);
-  --shadow:rgba(0,0,0,0.6);
-  --nav-bg:rgba(28,28,30,0.88);
-  --top-bg:rgba(28,28,30,0.88);
-  --input-bg:rgba(118,118,128,0.12);
-  --modal-bg:rgba(0,0,0,0.72);
-  --card-shadow:0 8px 32px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.06);
-  --glass-blur:blur(24px) saturate(180%);
+  /* ── Trading-terminal palette: deep navy panels, neon accents ── */
+  --bg:#060912;
+  --surface:rgba(13,20,40,0.96);
+  --card:rgba(14,23,46,0.74);
+  --card2:rgba(20,30,58,0.66);
+  --card3:rgba(28,40,72,0.58);
+  --border:rgba(120,150,210,0.14);
+  --border2:rgba(120,150,210,0.26);
+  --accent:#22d3ee;
+  --accent2:#38bdf8;
+  --accentbg:rgba(34,211,238,0.12);
+  --accentbrd:rgba(34,211,238,0.38);
+  --cyan:#22d3ee;
+  --cyanbg:rgba(34,211,238,0.1);
+  --indigo:#818cf8;
+  --indigobg:rgba(129,140,248,0.12);
+  --green:#34d399;
+  --greenbg:rgba(52,211,153,0.12);
+  --greenb:rgba(52,211,153,0.34);
+  --red:#f87171;
+  --redbg:rgba(248,113,113,0.12);
+  --redb:rgba(248,113,113,0.34);
+  --yellow:#fbbf24;
+  --yellowbg:rgba(251,191,36,0.12);
+  --text:#dbe5f7;
+  --text2:rgba(195,208,236,0.64);
+  --text3:rgba(140,162,205,0.5);
+  --shadow:rgba(0,0,0,0.65);
+  --nav-bg:rgba(9,14,28,0.9);
+  --top-bg:rgba(9,14,28,0.9);
+  --input-bg:rgba(120,150,210,0.08);
+  --modal-bg:rgba(3,6,14,0.78);
+  --card-shadow:0 8px 30px rgba(0,0,0,0.5),inset 0 1px 0 rgba(120,150,210,0.06);
+  --glass-blur:blur(22px) saturate(160%);
 }
 /* Light — iOS glass */
 :root[data-theme="light"]{
@@ -1182,9 +1183,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);
   -webkit-font-smoothing:antialiased;transition:background .3s,color .3s}
 body::before{content:'';position:fixed;inset:0;z-index:-1;pointer-events:none;
   background:
-    radial-gradient(ellipse 70% 50% at 15% 10%, rgba(0,122,255,0.18) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 55% at 85% 85%, rgba(94,92,230,0.14) 0%, transparent 60%),
-    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(0,122,255,0.06) 0%, transparent 70%)}
+    radial-gradient(ellipse 70% 50% at 15% 8%, rgba(34,211,238,0.14) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 55% at 85% 88%, rgba(52,211,153,0.10) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 40% at 50% 50%, rgba(56,189,248,0.05) 0%, transparent 70%)}
 [data-theme="light"] body::before{
   background:
     radial-gradient(ellipse 70% 50% at 10% 5%, rgba(0,122,255,0.1) 0%, transparent 60%),
@@ -1243,14 +1244,14 @@ button,input,select{font-family:inherit}
   cursor:pointer;font-size:8px;font-weight:700;letter-spacing:.3px;
   text-transform:uppercase;transition:color .2s;position:relative;
   min-height:54px;min-width:56px;flex:1 0 56px}
-.nav-btn.active{color:#007AFF}
+.nav-btn.active{color:var(--accent)}
 .nav-btn svg{width:19px;height:19px;stroke-width:1.8;transition:transform .2s}
 .nav-btn.active svg{transform:translateY(-1px)}
 .nav-dot{position:absolute;top:5px;right:calc(50% - 16px);width:6px;height:6px;
   border-radius:50%;background:var(--cyan);display:none}
 .nav-dot.show{display:block;animation:pulse 1.2s ease 4}
 .tab-line{position:absolute;bottom:0;left:50%;transform:translateX(-50%);
-  width:20px;height:3px;background:#007AFF;border-radius:3px 3px 0 0;
+  width:20px;height:3px;background:var(--accent);border-radius:3px 3px 0 0;
   opacity:0;transition:opacity .2s}
 .nav-btn.active .tab-line{opacity:1}
 
@@ -1793,7 +1794,7 @@ select.inp option{background:var(--card);color:var(--text)}
                    linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);
   background-size:44px 44px;
   animation:gridDrift 60s linear infinite}
-:root[data-theme="dark"]{--grid-line:rgba(0,122,255,.05)}
+:root[data-theme="dark"]{--grid-line:rgba(34,211,238,.05)}
 :root[data-theme="light"]{--grid-line:rgba(0,122,255,.04)}
 @keyframes gridDrift{from{background-position:0 0}to{background-position:44px 44px}}
 .bg-orb{position:absolute;border-radius:50%;filter:blur(90px);animation:orbFloat linear infinite}
@@ -3064,7 +3065,7 @@ select.inp option{background:var(--card);color:var(--text)}
 
 <script>
 /* ── Theme ───────────────────────────────────────────── */
-const _th = localStorage.getItem('theme') || 'light';
+const _th = localStorage.getItem('theme') || 'dark';
 document.documentElement.setAttribute('data-theme', _th);
 setThemeIcon(_th);
 function setThemeIcon(t) {
