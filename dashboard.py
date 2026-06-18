@@ -1493,19 +1493,28 @@ select.inp option{background:var(--card);color:var(--text)}
 .term{background:linear-gradient(180deg,#0c1226,#070b16);
   border:1px solid #1b2742;border-radius:14px;overflow:hidden;
   box-shadow:0 10px 34px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.03)}
-.term-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;
+.term-bar{display:flex;align-items:center;gap:10px;padding:10px 13px;
   background:linear-gradient(180deg,#141d38,#0d1428);border-bottom:1px solid #1b2742}
-.term-dots{display:flex;gap:6px;flex-shrink:0}
-.term-dots i{width:11px;height:11px;border-radius:50%;display:block}
-.td-r{background:#ff5f57}.td-y{background:#febc2e}.td-g{background:#28c840}
-.term-title{font-family:'SF Mono','Fira Code',monospace;font-size:11px;color:#7e8db0;
-  letter-spacing:.03em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.term-live{display:flex;align-items:center;gap:6px;flex-shrink:0;
-  font-family:'SF Mono','Fira Code',monospace;font-size:10px;font-weight:800;
-  color:#22d3ee;letter-spacing:.12em}
-.term-live-dot{width:7px;height:7px;border-radius:50%;background:#22d3ee;
-  box-shadow:0 0 9px #22d3ee;animation:tpulse 1.6s infinite}
+.term-live-tag{display:flex;align-items:center;gap:5px;flex-shrink:0;
+  font-family:'SF Mono','Fira Code',monospace;font-size:9px;font-weight:800;letter-spacing:.14em;
+  color:#34d399;padding:3px 8px;border:1px solid rgba(52,211,153,.35);border-radius:5px;
+  background:rgba(52,211,153,.08)}
+.term-live-dot{width:7px;height:7px;border-radius:50%;background:#34d399;
+  box-shadow:0 0 9px #34d399;animation:tpulse 1.6s infinite}
 @keyframes tpulse{0%,100%{opacity:1}50%{opacity:.2}}
+.term-title{font-family:'SF Mono','Fira Code',monospace;font-size:11px;font-weight:700;
+  color:#c3d0ec;letter-spacing:.06em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.term-host{color:#56648a;font-weight:500}
+.term-clock{font-family:'SF Mono','Fira Code',monospace;font-size:11px;font-weight:700;
+  color:#22d3ee;letter-spacing:.06em;flex-shrink:0}
+.term-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;
+  background:#141d36;border-bottom:1px solid #1b2742}
+.tstat{background:#0a1020;padding:9px 6px;text-align:center}
+.tstat-v{font-family:'SF Mono','Fira Code',monospace;font-size:17px;font-weight:800;
+  color:#c3d0ec;line-height:1}
+.tstat-v.sig{color:#22d3ee}.tstat-v.good{color:#34d399}.tstat-v.err{color:#f87171}
+.tstat-l{font-size:8px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+  color:#56648a;margin-top:4px}
 .term-tabs{display:flex;gap:0;padding:0 6px;background:#0a0f1f;
   border-bottom:1px solid #141d36;overflow-x:auto;scrollbar-width:none}
 .term-tabs::-webkit-scrollbar{display:none}
@@ -2498,9 +2507,15 @@ select.inp option{background:var(--card);color:var(--text)}
 <div class="page" id="page-logs"><div class="pad">
   <div class="term">
     <div class="term-bar">
-      <div class="term-dots"><i class="td-r"></i><i class="td-y"></i><i class="td-g"></i></div>
-      <div class="term-title">prolific@signals: ~/activity.log</div>
-      <div class="term-live"><span class="term-live-dot"></span><span id="log-count">0</span> LINES</div>
+      <span class="term-live-tag"><span class="term-live-dot"></span>LIVE</span>
+      <div class="term-title">ACTIVITY TERMINAL<span class="term-host"> · prolific@signals</span></div>
+      <div class="term-clock" id="term-clock">--:--:--</div>
+    </div>
+    <div class="term-stats">
+      <div class="tstat"><div class="tstat-v" id="ts-total"><span id="log-count">0</span></div><div class="tstat-l">Lines</div></div>
+      <div class="tstat"><div class="tstat-v sig"  id="ts-sig">0</div><div class="tstat-l">Signals</div></div>
+      <div class="tstat"><div class="tstat-v good" id="ts-trade">0</div><div class="tstat-l">Trades</div></div>
+      <div class="tstat"><div class="tstat-v err"  id="ts-err">0</div><div class="tstat-l">Errors</div></div>
     </div>
     <div class="term-tabs">
       <span class="fpill active" onclick="filterLogs('all',this)">All</span>
@@ -5680,6 +5695,32 @@ function _drawEquityCurve(curve, startEq) {
   // Colour line by outcome
   if (lineEl) lineEl.setAttribute('stroke', last >= (startEq||0) ? 'var(--green)' : 'var(--red)');
 }
+
+/* ── Terminal cosmetics — design-only, additive (no existing fn modified) ── */
+(function(){
+  function termStats(){
+    if (typeof allLogs === 'undefined') return;
+    const L = allLogs || [];
+    const cnt = (pred) => L.filter(pred).length;
+    const set = (id,v) => { const e=document.getElementById(id); if(e) e.textContent=v; };
+    set('ts-sig',   cnt(l => l.includes('SIGNAL')||l.includes('MSG [')));
+    set('ts-trade', cnt(l => l.includes('OPENED')||l.includes('CLOSED')));
+    set('ts-err',   cnt(l => l.includes('ERROR')||l.includes('FAIL')||l.includes('❌')));
+  }
+  // Wrap renderLogs so stats refresh whenever the feed re-renders — original untouched
+  if (typeof renderLogs === 'function'){
+    const _origRenderLogs = renderLogs;
+    renderLogs = function(){ const r = _origRenderLogs.apply(this, arguments); try{ termStats(); }catch(e){} return r; };
+  }
+  function termClock(){
+    const e = document.getElementById('term-clock'); if(!e) return;
+    const d = new Date();
+    e.textContent = [d.getHours(),d.getMinutes(),d.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':');
+  }
+  termClock(); termStats();
+  setInterval(termClock, 1000);
+  setInterval(termStats, 4000);
+})();
 </script>
 
 <!-- ── Risk Strategy Detail Sheet ── -->
