@@ -1478,7 +1478,7 @@ select.inp option{background:var(--card);color:var(--text)}
 /* ── LOG ─────────────────────────────────────────────── */
 /* Logs page gets its own scroll context so the log-box is the sole
    scroll container — avoids nested-scroll touch issues on iOS */
-#page-logs{overflow:hidden !important;display:flex;flex-direction:column}
+#page-logs.active{overflow:hidden;display:flex;flex-direction:column}
 #page-logs .pad{display:flex;flex-direction:column;flex:1;min-height:0;
   padding:14px 14px calc(68px + env(safe-area-inset-bottom,0px))}
 #page-logs .card.mb{flex-shrink:0}
