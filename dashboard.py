@@ -1476,8 +1476,14 @@ select.inp option{background:var(--card);color:var(--text)}
 .info-val{font-size:12.5px;font-weight:700}
 
 /* ── LOG ─────────────────────────────────────────────── */
+/* Logs page gets its own scroll context so the log-box is the sole
+   scroll container — avoids nested-scroll touch issues on iOS */
+#page-logs{overflow:hidden !important;display:flex;flex-direction:column}
+#page-logs .pad{display:flex;flex-direction:column;flex:1;min-height:0;
+  padding:14px 14px calc(68px + env(safe-area-inset-bottom,0px))}
+#page-logs .card.mb{flex-shrink:0}
 .log-box{background:var(--input-bg);border:1px solid var(--border);border-radius:12px;
-  padding:12px;max-height:calc(100dvh - 260px);overflow-y:auto;
+  padding:12px;flex:1;min-height:0;overflow-y:auto;
   -webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .log-line{font-size:11px;font-family:'SF Mono','Fira Code',monospace;
   padding:3px 0;line-height:1.55;color:var(--text3);word-break:break-all}
