@@ -1165,10 +1165,10 @@ HTML = r"""<!DOCTYPE html>
   --cyanbg:rgba(50,173,230,0.08);
   --indigo:#5E5CE6;
   --indigobg:rgba(94,92,230,0.08);
-  --green:#34C759;
+  --green:#34d399;
   --greenbg:rgba(52,199,89,0.08);
   --greenb:rgba(52,199,89,0.25);
-  --red:#FF3B30;
+  --red:#f87171;
   --redbg:rgba(255,59,48,0.08);
   --redb:rgba(255,59,48,0.25);
   --yellow:#FF9500;
@@ -1387,7 +1387,7 @@ button,input,select{font-family:inherit}
 .cs-stat-lbl{font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;
   color:var(--text3);margin-bottom:4px}
 .cs-stat-val{font-size:16px;font-weight:800}
-.cs-warn{background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.2);
+.cs-warn{background:var(--redbg);border:1px solid var(--redb);
   border-radius:10px;padding:10px 12px;font-size:11px;color:var(--red);margin-bottom:14px}
 .cs-demo-note{background:var(--indigobg);border:1px solid rgba(129,140,248,.25);
   border-radius:10px;padding:10px 12px;font-size:11px;color:var(--indigo);margin-bottom:10px}
@@ -1413,7 +1413,7 @@ button,input,select{font-family:inherit}
 .b-new{background:linear-gradient(135deg,rgba(59,130,246,.2),rgba(6,182,212,.2));
   color:var(--cyan);border:1px solid rgba(6,182,212,.4);animation:glow 1.5s ease 4}
 .b-parse{background:rgba(245,158,11,.12);color:var(--yellow);border:1px solid rgba(245,158,11,.3)}
-.b-nofunds{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+.b-nofunds{background:var(--redbg);color:var(--red);border:1px solid var(--redb)}
 @keyframes glow{0%,100%{box-shadow:none}50%{box-shadow:0 0 8px rgba(6,182,212,.5)}}
 .live-dot{display:inline-block;width:6px;height:6px;border-radius:50%;
   background:var(--green);margin-right:5px;box-shadow:0 0 6px var(--green);animation:pulse 2s infinite}
@@ -2058,10 +2058,10 @@ select.inp option{background:var(--card);color:var(--text)}
           <span id="rg-vis-lbl">Hide</span>
         </button>
         <div id="rg-status-pill" style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:6px;
-          background:rgba(52,199,89,.15);color:#34C759">TRADING OK</div>
+          background:rgba(52,199,89,.15);color:#34d399">TRADING OK</div>
         <button onclick="rgReset()" id="rg-reset-btn" style="display:none;background:rgba(255,59,48,.15);
           border:1px solid rgba(255,59,48,.3);border-radius:6px;padding:2px 8px;cursor:pointer;
-          font-size:9px;font-weight:800;color:#FF3B30">RESET</button>
+          font-size:9px;font-weight:800;color:#f87171">RESET</button>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
@@ -2117,7 +2117,7 @@ select.inp option{background:var(--card);color:var(--text)}
           <path d="M4,40 A36,36 0 0,1 76,40" fill="none" stroke="rgba(128,128,128,.15)" stroke-width="8" stroke-linecap="round"/>
           <!-- coloured fill arc -->
           <path id="fng-arc" d="M4,40 A36,36 0 0,1 76,40" fill="none"
-            stroke="#FF3B30" stroke-width="8" stroke-linecap="round"
+            stroke="#f87171" stroke-width="8" stroke-linecap="round"
             stroke-dasharray="113" stroke-dashoffset="113"
             style="transition:stroke-dashoffset .8s cubic-bezier(.4,0,.2,1),stroke .4s"/>
           <!-- needle -->
@@ -2135,7 +2135,7 @@ select.inp option{background:var(--card);color:var(--text)}
           color:var(--text);margin-bottom:6px">—</div>
         <!-- 5-zone gradient bar -->
         <div style="height:5px;border-radius:3px;background:linear-gradient(90deg,
-          #FF3B30 0%,#FF9500 25%,#FFD60A 50%,#34C759 75%,#00C7BE 100%);
+          #f87171 0%,#FF9500 25%,#FFD60A 50%,#34d399 75%,#00C7BE 100%);
           margin-bottom:6px;position:relative">
           <div id="fng-marker" style="position:absolute;top:-3px;width:10px;height:10px;
             border-radius:50%;background:#fff;border:2px solid var(--text);
@@ -2824,7 +2824,7 @@ select.inp option{background:var(--card);color:var(--text)}
     <!-- Live P&L preview -->
     <div id="sltp-pnl-box" style="display:none;border-radius:12px;overflow:hidden;margin-bottom:12px;font-size:12px">
       <div style="display:flex">
-        <div id="sltp-sl-pnl" style="flex:1;padding:10px 12px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);border-radius:10px 0 0 10px">
+        <div id="sltp-sl-pnl" style="flex:1;padding:10px 12px;background:var(--redbg);border:1px solid var(--redb);border-radius:10px 0 0 10px">
           <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--red);margin-bottom:3px">Max Loss (SL)</div>
           <div id="sltp-sl-amt" style="font-size:18px;font-weight:900;color:var(--red);letter-spacing:-.3px">—</div>
           <div id="sltp-sl-pct" style="font-size:10px;color:var(--red);opacity:.7;margin-top:1px">—</div>
@@ -3137,7 +3137,7 @@ function goTab(tab) {
 function toast(msg, ok = true, dur = 3200) {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.style.borderColor = ok ? 'rgba(34,197,94,.4)' : 'rgba(239,68,68,.4)';
+  t.style.borderColor = ok ? 'var(--greenb)' : 'var(--redb)';
   t.style.display = 'block';
   clearTimeout(t._tid);
   t._tid = setTimeout(() => t.style.display = 'none', dur);
@@ -3554,7 +3554,7 @@ async function updateRRHint(prefix) {
     if (lossEl)  lossEl.textContent  = '-' + _fmt$(rr.loss);
     if (gainEl)  gainEl.textContent  = rr.gain != null ? '+' + _fmt$(rr.gain) : '—';
     if (ratioEl) ratioEl.textContent = rr.rr   != null ? '1 : ' + rr.rr.toFixed(2) : '—';
-    if (ratioEl) ratioEl.style.color = rr.rr >= 2 ? 'var(--green)' : rr.rr >= 1 ? 'var(--yellow,#f59e0b)' : 'var(--red)';
+    if (ratioEl) ratioEl.style.color = rr.rr >= 2 ? 'var(--green)' : rr.rr >= 1 ? 'var(--yellow)' : 'var(--red)';
   } else {
     const prev = document.getElementById('ad-trade-preview');
     if (!prev || !rr) return;
@@ -3567,7 +3567,7 @@ async function updateRRHint(prefix) {
     if (rrRow)   rrRow.style.display   = rr.rr   != null ? 'flex' : 'none';
     if (gainEl)  gainEl.textContent    = rr.gain != null ? '+' + _fmt$(rr.gain) : '—';
     if (rrEl)    rrEl.textContent      = rr.rr   != null ? '1 : ' + rr.rr.toFixed(2) : '—';
-    if (rrEl)    rrEl.style.color      = rr.rr >= 2 ? 'var(--green)' : rr.rr >= 1 ? 'var(--yellow,#f59e0b)' : 'var(--red)';
+    if (rrEl)    rrEl.style.color      = rr.rr >= 2 ? 'var(--green)' : rr.rr >= 1 ? 'var(--yellow)' : 'var(--red)';
     const lossEl = document.getElementById('ad-prev-loss');
     if (lossEl)  lossEl.textContent = '-' + _fmt$(rr.loss);
   }
@@ -3640,7 +3640,7 @@ function updateSltpPnl() {
       const tpDist = Math.abs(tpPrice - entry);
       const rr = slDist > 0 ? tpDist / slDist : null;
       tpRR.textContent = rr ? `${tpPctV.toFixed(2)}% · R:R 1:${rr.toFixed(2)}` : `${tpPctV.toFixed(2)}% on position`;
-      tpRR.style.color = rr >= 2 ? 'var(--green)' : rr >= 1 ? '#f59e0b' : 'var(--red)';
+      tpRR.style.color = rr >= 2 ? 'var(--green)' : rr >= 1 ? 'var(--yellow)' : 'var(--red)';
     } else {
       tpRR.textContent = tpPctV.toFixed(2) + '% on position';
     }
@@ -4082,7 +4082,7 @@ function renderPhase(d, equity) {
 
   let phase, riskMult, nextTarget, phaseColor;
   if (equity >= p3) {
-    phase = 3; riskMult = 2.5; nextTarget = null; phaseColor = '#22c55e';
+    phase = 3; riskMult = 2.5; nextTarget = null; phaseColor = 'var(--green)';
   } else if (equity >= p2) {
     phase = 2; riskMult = 1.5; nextTarget = p3; phaseColor = 'var(--accent)';
   } else {
@@ -4101,7 +4101,7 @@ function renderPhase(d, equity) {
   const bar   = document.getElementById('phase-bar');
   if (badge) {
     badge.textContent    = `Phase ${phase}`;
-    badge.style.background = phase === 1 ? 'rgba(6,182,212,.15)' : phase === 2 ? 'var(--accentbg)' : 'rgba(34,197,94,.15)';
+    badge.style.background = phase === 1 ? 'var(--cyanbg)' : phase === 2 ? 'var(--accentbg)' : 'var(--greenbg)';
     badge.style.color      = phaseColor;
   }
   if (bar) { bar.style.width = pct.toFixed(1) + '%'; bar.style.background = phaseColor; }
@@ -5034,10 +5034,10 @@ function openPhaseDetail(n) {
     },
     3: {
       title:'Scale', subtitle:'Maximum compounding — protect what you\'ve built.',
-      color:'linear-gradient(135deg,#34C759,#30A048)',
+      color:'linear-gradient(135deg,#34d399,#30A048)',
       multLabel:'2.5×', mult:2.5,
       rangeStart:p3, rangeEnd:null,
-      color_hex:'#34C759',
+      color_hex:'#34d399',
       rules:[
         {icon:'💰', text:'Risk is ' + (risk*2.5).toFixed(1) + '% per trade — 2.5× base. Each trade now moves real money. Size is earned, not assumed.'},
         {icon:'🎯', text:'Minimum AI score gate: 70. You are trading at full power — only elite setups.'},
@@ -5401,7 +5401,7 @@ async function fetchRiskGuard() {
       if (tripped) {
         pill.textContent = '⛔ BLOCKED';
         pill.style.background = 'rgba(255,59,48,.15)';
-        pill.style.color = '#FF3B30';
+        pill.style.color = '#f87171';
       } else if (openPos >= maxPos) {
         pill.textContent = '⚠ MAX POS';
         pill.style.background = 'rgba(255,149,0,.15)';
@@ -5409,7 +5409,7 @@ async function fetchRiskGuard() {
       } else {
         pill.textContent = 'TRADING OK';
         pill.style.background = 'rgba(52,199,89,.15)';
-        pill.style.color = '#34C759';
+        pill.style.color = '#34d399';
       }
     }
     if (resetBtn) resetBtn.style.display = tripped ? 'block' : 'none';
@@ -5440,7 +5440,7 @@ async function fetchRiskGuard() {
     if (bar) {
       const usedPct = ddLimit > 0 ? Math.min(100, Math.max(0, (-pnlPct / ddLimit) * 100)) : 0;
       bar.style.width = usedPct + '%';
-      bar.style.background = usedPct >= 100 ? '#FF3B30' : usedPct >= 70 ? '#FF9500' : '#34C759';
+      bar.style.background = usedPct >= 100 ? '#f87171' : usedPct >= 70 ? '#FF9500' : '#34d399';
     }
     if (barLbl) barLbl.textContent = pnlPct < 0 ? `${(-pnlPct).toFixed(2)}% of ${ddLimit}% limit used` : 'Daily loss used';
   } catch(e) {}
@@ -5478,10 +5478,10 @@ function _applyFng(d) {
   if (!d || d.value == null) return;
   const v   = d.value;
   const lbl = d.classification;
-  const col = v <= 24 ? '#FF3B30'
+  const col = v <= 24 ? '#f87171'
             : v <= 49 ? '#FF9500'
             : v <= 54 ? '#FFD60A'
-            : v <= 74 ? '#34C759'
+            : v <= 74 ? '#34d399'
             :            '#00C7BE';
 
   const arcLen = 113.1;
@@ -5607,7 +5607,7 @@ function _renderBacktestResults(r) {
     banner.innerHTML = '✅ PROP FIRM PASS — Max DD ' + r.max_dd_pct?.toFixed(1) + '% · ' + (r.prop_daily_violations?.length || 0) + ' daily violations · Profit Factor ' + r.profit_factor;
   } else {
     const viols = r.prop_daily_violations?.length || 0;
-    banner.style.cssText = 'background:rgba(239,68,68,.10);border:1.5px solid rgba(239,68,68,.3);border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:12px;font-weight:700;color:var(--red)';
+    banner.style.cssText = 'background:var(--redbg);border:1.5px solid var(--redb);border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:12px;font-weight:700;color:var(--red)';
     banner.innerHTML = '⛔ PROP FIRM RISK — DD ' + r.max_dd_pct?.toFixed(1) + '% · ' + viols + ' day(s) exceeded 5% daily loss limit';
   }
 
@@ -5670,7 +5670,7 @@ function _renderBacktestResults(r) {
       return `<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)">
         <span style="width:18px;text-align:center">${badge}</span>
         <span style="width:72px;font-weight:800;font-size:10px">${(t.symbol||'').replace('USDT','')}</span>
-        <span style="width:28px;font-size:9px;padding:1px 4px;border-radius:4px;background:${t.side==='Buy'?'var(--greenbg)':'rgba(239,68,68,.15)'};color:${t.side==='Buy'?'var(--green)':'var(--red)'}">${t.side==='Buy'?'L':'S'}</span>
+        <span style="width:28px;font-size:9px;padding:1px 4px;border-radius:4px;background:${t.side==='Buy'?'var(--greenbg)':'var(--redbg)'};color:${t.side==='Buy'?'var(--green)':'var(--red)'}">${t.side==='Buy'?'L':'S'}</span>
         <span style="width:34px;font-size:9px;color:var(--text3)">${t.score||'?'}</span>
         <span style="flex:1;text-align:right;font-weight:800;color:${clr}">${t.r_achieved>0?'+':''}${t.r_achieved?.toFixed(2)}R</span>
         <span style="width:32px;text-align:right;font-size:9px;color:var(--text3)">${t.hold_hours||0}h</span>
@@ -5841,16 +5841,16 @@ function _drawEquityCurve(curve, startEq) {
         <div style="width:38px;height:38px;border-radius:12px;
           background:linear-gradient(135deg,rgba(52,199,89,.25),rgba(52,199,89,.1));
           display:flex;align-items:center;justify-content:center;flex-shrink:0;
-          font-size:18px;font-weight:900;color:#34C759">3</div>
+          font-size:18px;font-weight:900;color:#34d399">3</div>
         <div style="flex:1">
           <div style="font-size:13px;font-weight:800">Phase 3 — Scale</div>
           <div style="font-size:10px;color:var(--text3);margin-top:3px">
             <span id="rd-p3thresh2">$1500</span>+
-            &nbsp;·&nbsp; Risk: <span id="rd-p3risk" style="color:#34C759;font-weight:700">5%</span>
+            &nbsp;·&nbsp; Risk: <span id="rd-p3risk" style="color:#34d399;font-weight:700">5%</span>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:6px">
-          <div id="rd-p3-active" style="display:none;width:8px;height:8px;border-radius:50%;background:#34C759"></div>
+          <div id="rd-p3-active" style="display:none;width:8px;height:8px;border-radius:50%;background:#34d399"></div>
           <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="var(--text3)" stroke-width="2.5">
             <polyline points="9 18 15 12 9 6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
