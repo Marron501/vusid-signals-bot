@@ -1495,6 +1495,16 @@ select.inp option{background:var(--card);color:var(--text)}
   font-weight:800;letter-spacing:.5px;margin-left:5px;vertical-align:middle}
 .badge-live{background:var(--greenbg);color:var(--green);border:1px solid var(--greenb)}
 .badge-demo{background:var(--cyanbg);color:var(--cyan);border:1px solid rgba(34,211,238,.3)}
+/* Account selector chips */
+.acc-chip-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:10px;margin-bottom:8px;scrollbar-width:none}
+.acc-chip-row::-webkit-scrollbar{display:none}
+.acc-chip{display:flex;align-items:center;gap:5px;padding:6px 14px;border-radius:20px;
+  white-space:nowrap;cursor:pointer;border:1.5px solid var(--border);background:var(--card);
+  font-size:11px;font-weight:700;color:var(--text2);transition:all .15s;flex-shrink:0}
+.acc-chip:active{transform:scale(.96)}
+.acc-chip.active{border-color:var(--accent);background:var(--accentbg);color:var(--accent2)}
+.acc-chip .chip-mode{font-size:8px;font-weight:800;letter-spacing:.4px;padding:1px 4px;
+  border-radius:3px;background:var(--cyanbg);color:var(--cyan)}
 
 /* ── ARC GAUGE ───────────────────────────────────────── */
 .gauge-wrap{display:flex;flex-direction:column;align-items:center;margin:4px 0 8px}
@@ -1710,17 +1720,30 @@ select.inp option{background:var(--card);color:var(--text)}
 <!-- TOP BAR -->
 <div class="topbar">
   <div style="display:flex;align-items:center;gap:10px">
-    <!-- Prolific 3D logo mark -->
+    <!-- Prolific trading logo -->
     <svg width="42" height="42" viewBox="0 0 42 42" fill="none" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <linearGradient id="lg-bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%"   stop-color="#2563EB"/>
-          <stop offset="100%" stop-color="#0D1F3C"/>
+        <linearGradient id="lg-bg" x1="0" y1="0" x2="42" y2="42" gradientUnits="userSpaceOnUse">
+          <stop offset="0%"   stop-color="#0C1A35"/>
+          <stop offset="100%" stop-color="#1A3A6B"/>
         </linearGradient>
       </defs>
-      <circle cx="21" cy="21" r="20" fill="url(#lg-bg)"/>
-      <!-- P letterform -->
-      <path d="M13 11h8a6 6 0 0 1 0 12h-4v8h-4V11z" fill="white" opacity="0.95"/>
+      <rect width="42" height="42" rx="12" fill="url(#lg-bg)"/>
+      <!-- Trend line -->
+      <polyline points="5,36 13,29 20,31 28,21 38,11"
+        stroke="rgba(125,185,232,0.35)" stroke-width="1.5" fill="none"
+        stroke-linecap="round" stroke-linejoin="round"/>
+      <!-- Candle 1: bearish (red, small) -->
+      <line x1="10" y1="27" x2="10" y2="37" stroke="#F87171" stroke-width="1.4" stroke-linecap="round"/>
+      <rect x="7" y="29" width="6" height="5" rx="1.2" fill="#F87171" opacity="0.85"/>
+      <!-- Candle 2: bullish (green, medium) -->
+      <line x1="21" y1="20" x2="21" y2="33" stroke="#34D399" stroke-width="1.4" stroke-linecap="round"/>
+      <rect x="18" y="22" width="6" height="8" rx="1.2" fill="#34D399"/>
+      <!-- Candle 3: bullish breakout (green, tall) -->
+      <line x1="32" y1="10" x2="32" y2="27" stroke="#34D399" stroke-width="1.4" stroke-linecap="round"/>
+      <rect x="29" y="12" width="6" height="11" rx="1.2" fill="#34D399"/>
+      <!-- Signal bolt (top-left) -->
+      <path d="M6.5 7.5 L4.5 13 H7 L5.5 18.5 L12 11 H9 Z" fill="#FCD34D"/>
     </svg>
     <div>
       <div class="brand-name">Prolific</div>
@@ -1777,10 +1800,15 @@ select.inp option{background:var(--card);color:var(--text)}
 <!-- ① HOME -->
 <div class="page active" id="page-home"><div class="pad">
 
+  <!-- Account selector chips -->
+  <div class="acc-chip-row" id="acc-chip-row">
+    <button class="acc-chip active" id="acc-chip-primary" onclick="selectDashAcc('primary')">Primary</button>
+  </div>
+
   <!-- Hero balance -->
   <div class="hero">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2px">
-      <div class="hero-lbl">Primary Balance</div>
+      <div class="hero-lbl" id="hero-acc-lbl">Primary Balance</div>
       <button onclick="toggleBalVis()" id="bal-vis-btn" style="background:rgba(255,255,255,.15);
         border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:4px 8px;cursor:pointer;
         display:flex;align-items:center;gap:4px;font-size:9px;font-weight:700;color:rgba(255,255,255,.8)">
@@ -1794,7 +1822,7 @@ select.inp option{background:var(--card);color:var(--text)}
       </button>
     </div>
     <div class="hero-amt" id="b-equity">— USDT</div>
-    <div class="hero-sub">Bybit Unified · <span id="b-ts">—</span></div>
+    <div class="hero-sub"><span id="b-acc-mode">Bybit Unified</span> · <span id="b-ts">—</span></div>
     <div class="bal-grid">
       <div class="bal-box">
         <div class="bal-lbl">Available</div>
@@ -2911,19 +2939,13 @@ function render() {
   document.getElementById('dot').className = 'dot ' + (on ? 'dot-on' : 'dot-off');
   document.getElementById('status-txt').textContent = on ? 'Online' : 'Offline';
 
-  // Balance
-  const acc = d.account;
-  document.getElementById('b-equity').textContent  = acc.equity.toFixed(2) + ' USDT';
-  document.getElementById('b-avail').textContent   = (acc.available || 0).toFixed(2);
-  document.getElementById('b-margin').textContent  = (acc.used_margin || 0).toFixed(2);
-  const upnl = acc.unrealised_pnl || acc.total_pnl || 0;
-  const upEl = document.getElementById('b-upnl');
-  upEl.textContent = (upnl >= 0 ? '+' : '') + upnl.toFixed(2);
-  upEl.className   = 'bal-val ' + (upnl >= 0 ? 'pos' : 'neg');
-  document.getElementById('b-pertrade').textContent = (acc.equity * d.equity_fraction).toFixed(2);
-  document.getElementById('b-lev').textContent      = d.default_leverage;
-  document.getElementById('b-ts').textContent       = new Date(d.timestamp).toLocaleTimeString();
-  if (!_balVisible) _applyBalVis();  // re-mask after data refresh
+  // Balance — show whichever account is selected
+  if (_dashAccId === 'primary') {
+    const acc = {...d.account, unrealised_pnl: d.account.unrealised_pnl || d.account.total_pnl || 0};
+    _applyHeroBalance(acc, d.equity_fraction, d.default_leverage, d.timestamp);
+  } else {
+    renderHeroForAcc(_dashAccId);  // async, shows cached or fetches
+  }
 
   // Stats
   document.getElementById('s-wins').textContent   = d.stats.wins;
@@ -3986,6 +4008,75 @@ async function fetchAccBal(id) {
     <div class="acc-meta"><div class="acc-meta-lbl">Balance</div><div class="acc-meta-val blue">${(b.equity||0).toFixed(2)}</div><div style="font-size:9px;color:var(--text3)">USDT</div></div>
     <div class="acc-meta"><div class="acc-meta-lbl">Unreal. PnL</div><div class="acc-meta-val ${pnl>=0?'pos':'neg'}">${(pnl>=0?'+':'')+pnl.toFixed(2)}</div><div style="font-size:9px;color:var(--text3)">USDT</div></div>`;
 }
+/* ── Dashboard account selector ───────────────────────── */
+let _dashAccId = localStorage.getItem('dashAccId') || 'primary';
+
+function renderAccChips() {
+  const row = document.getElementById('acc-chip-row');
+  if (!row) return;
+  const all = [{id:'primary', name:'Primary', demo:false, testnet:false}, ..._accounts.filter(a => a.enabled !== false)];
+  row.innerHTML = all.map(a => {
+    const mode = a.testnet ? 'TN' : a.demo ? 'DM' : '';
+    const active = a.id === _dashAccId;
+    return `<button class="acc-chip${active?' active':''}" onclick="selectDashAcc('${a.id}')">
+      ${mode ? `<span class="chip-mode">${mode}</span>` : ''}${a.name}
+    </button>`;
+  }).join('');
+}
+
+async function selectDashAcc(id) {
+  _dashAccId = id;
+  localStorage.setItem('dashAccId', id);
+  renderAccChips();
+  await renderHeroForAcc(id);
+}
+
+async function renderHeroForAcc(id) {
+  const lbl     = document.getElementById('hero-acc-lbl');
+  const modeLbl = document.getElementById('b-acc-mode');
+  if (id === 'primary') {
+    if (!DATA) return;
+    const acc = DATA.account;
+    _applyHeroBalance(acc, DATA.equity_fraction, DATA.default_leverage, DATA.timestamp);
+    if (lbl) lbl.textContent = 'Primary Balance';
+    if (modeLbl) modeLbl.textContent = 'Bybit Live';
+    return;
+  }
+  const acc = _accounts.find(a => a.id === id);
+  if (!acc) return;
+  if (lbl) lbl.textContent = acc.name + ' Balance';
+  const mode = acc.testnet ? 'Testnet' : acc.demo ? 'Demo' : 'Live';
+  if (modeLbl) modeLbl.textContent = 'Bybit ' + mode;
+  let bal = _homeAccBalCache[id];
+  if (!bal) {
+    try {
+      const r = await fetch('/api/accounts/'+id+'/balance');
+      bal = await r.json();
+      _homeAccBalCache[id] = bal;
+    } catch(_) { return; }
+  }
+  _applyHeroBalance({
+    equity:         bal.equity         || 0,
+    available:      bal.available      || 0,
+    used_margin:    bal.used_margin    || 0,
+    unrealised_pnl: bal.unrealised_pnl || 0,
+  }, acc.equity_fraction || 0.1, acc.leverage || 5, Date.now());
+}
+
+function _applyHeroBalance(acc, eqFrac, lev, ts) {
+  document.getElementById('b-equity').textContent  = (acc.equity||0).toFixed(2) + ' USDT';
+  document.getElementById('b-avail').textContent   = (acc.available||0).toFixed(2);
+  document.getElementById('b-margin').textContent  = (acc.used_margin||0).toFixed(2);
+  const upnl = acc.unrealised_pnl || 0;
+  const upEl = document.getElementById('b-upnl');
+  upEl.textContent = (upnl >= 0 ? '+' : '') + upnl.toFixed(2);
+  upEl.className   = 'bal-val ' + (upnl >= 0 ? 'pos' : 'neg');
+  document.getElementById('b-pertrade').textContent = ((acc.equity||0) * eqFrac).toFixed(2);
+  document.getElementById('b-lev').textContent      = lev;
+  document.getElementById('b-ts').textContent       = new Date(ts).toLocaleTimeString();
+  if (!_balVisible) _applyBalVis();
+}
+
 /* ── Home account cards ────────────────────────────────── */
 let _homeAccBalCache = {};
 
@@ -4049,6 +4140,16 @@ function renderHomeAccounts() {
   });
 
   el.innerHTML = cards.length ? cards.join('') : '<div class="acct-mini" style="opacity:.5;cursor:default"><div class="acct-mini-body"><div class="acct-mini-name" style="color:var(--text3)">No accounts configured</div></div></div>';
+  renderAccChips();
+  // Pre-fetch balances for all secondary accounts in the background
+  _accounts.filter(a => a.enabled !== false && a.api_key).forEach(a => {
+    if (!_homeAccBalCache[a.id]) {
+      fetch('/api/accounts/'+a.id+'/balance').then(r=>r.json()).then(b => {
+        _homeAccBalCache[a.id] = b;
+        if (_dashAccId === a.id) renderHeroForAcc(a.id);
+      }).catch(()=>{});
+    }
+  });
 }
 
 /* ── Account Controls (Settings page) ─────────────── */
