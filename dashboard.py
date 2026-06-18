@@ -1475,16 +1475,7 @@ select.inp option{background:var(--card);color:var(--text)}
 .info-key{font-size:12.5px;color:var(--text2)}
 .info-val{font-size:12.5px;font-weight:700}
 
-/* ── LOG ─────────────────────────────────────────────── */
-/* No custom scroll container — the .page itself scrolls, exactly like
-   every other page. log-box just flows naturally inside it. */
-.log-box{background:var(--input-bg);border:1px solid var(--border);border-radius:12px;
-  padding:12px}
-.log-line{font-size:11px;font-family:'SF Mono','Fira Code',monospace;
-  padding:3px 0;line-height:1.55;color:var(--text3);word-break:break-all}
-.log-line.err{color:var(--red)}.log-line.warn{color:var(--yellow)}
-.log-line.good{color:var(--green)}.log-line.info{color:var(--accent2)}
-.log-line.sig{color:var(--cyan);font-weight:700}
+/* ── shared filter pills (used by Signals page) ───────── */
 .fpills{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto;padding-bottom:4px;
   -webkit-overflow-scrolling:touch;scrollbar-width:none}
 .fpills::-webkit-scrollbar{display:none}
@@ -1493,6 +1484,63 @@ select.inp option{background:var(--card);color:var(--text)}
   cursor:pointer;white-space:nowrap;transition:all .2s;min-height:36px;
   display:inline-flex;align-items:center}
 .fpill.active{background:var(--accentbg);color:var(--accent2);border-color:var(--accentbrd)}
+
+/* ── LOG TERMINAL ─────────────────────────────────────── */
+/* Professional dark trading-console. The .page scrolls (no nested scroll); the
+   panel flows. Self-contained dark palette so it reads as a real terminal
+   regardless of the app's light/dark theme. JS hooks (#log-box, .log-line +
+   severity classes, .fpill) are unchanged. */
+.term{background:linear-gradient(180deg,#0c1226,#070b16);
+  border:1px solid #1b2742;border-radius:14px;overflow:hidden;
+  box-shadow:0 10px 34px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.03)}
+.term-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;
+  background:linear-gradient(180deg,#141d38,#0d1428);border-bottom:1px solid #1b2742}
+.term-dots{display:flex;gap:6px;flex-shrink:0}
+.term-dots i{width:11px;height:11px;border-radius:50%;display:block}
+.td-r{background:#ff5f57}.td-y{background:#febc2e}.td-g{background:#28c840}
+.term-title{font-family:'SF Mono','Fira Code',monospace;font-size:11px;color:#7e8db0;
+  letter-spacing:.03em;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.term-live{display:flex;align-items:center;gap:6px;flex-shrink:0;
+  font-family:'SF Mono','Fira Code',monospace;font-size:10px;font-weight:800;
+  color:#22d3ee;letter-spacing:.12em}
+.term-live-dot{width:7px;height:7px;border-radius:50%;background:#22d3ee;
+  box-shadow:0 0 9px #22d3ee;animation:tpulse 1.6s infinite}
+@keyframes tpulse{0%,100%{opacity:1}50%{opacity:.2}}
+.term-tabs{display:flex;gap:0;padding:0 6px;background:#0a0f1f;
+  border-bottom:1px solid #141d36;overflow-x:auto;scrollbar-width:none}
+.term-tabs::-webkit-scrollbar{display:none}
+.term-tabs .fpill{background:none;border:none;border-radius:0;color:#566489;
+  font-family:'SF Mono','Fira Code',monospace;font-size:10px;font-weight:800;
+  letter-spacing:.14em;padding:11px 14px;min-height:0;white-space:nowrap;cursor:pointer;
+  text-transform:uppercase;border-bottom:2px solid transparent;transition:color .15s}
+.term-tabs .fpill:hover{color:#9fb0d0}
+.term-tabs .fpill.active{color:#22d3ee;border-bottom-color:#22d3ee;background:rgba(34,211,238,.06)}
+.log-box{background:
+  repeating-linear-gradient(0deg,transparent 0 27px,rgba(255,255,255,.013) 27px 28px),
+  radial-gradient(120% 60% at 50% 0,rgba(34,211,238,.05),transparent 55%),#070b16;
+  border:none;border-radius:0;padding:8px 0;min-height:320px;
+  font-family:'SF Mono','Fira Code',monospace}
+.log-line{font-size:11px;line-height:1.55;color:#9fb0d0;
+  padding:3px 14px 3px 32px;position:relative;white-space:pre-wrap;word-break:break-word;
+  border-left:2px solid transparent}
+.log-line::before{content:'›';position:absolute;left:13px;color:#33436a;font-weight:700}
+.log-line:hover{background:rgba(255,255,255,.025)}
+.log-line.err{color:#f87171;border-left-color:#f87171;background:rgba(248,113,113,.06)}
+.log-line.err::before{content:'✕';color:#f87171}
+.log-line.warn{color:#fbbf24;border-left-color:#fbbf24}
+.log-line.warn::before{content:'!';color:#fbbf24}
+.log-line.good{color:#34d399;border-left-color:#34d399}
+.log-line.good::before{content:'✓';color:#34d399}
+.log-line.info{color:#60a5fa}
+.log-line.info::before{content:'i';color:#60a5fa}
+.log-line.sig{color:#22d3ee;font-weight:700;border-left-color:#22d3ee}
+.log-line.sig::before{content:'◆';color:#22d3ee}
+.term-prompt{display:flex;align-items:center;gap:7px;padding:9px 14px;background:#0a0f1f;
+  border-top:1px solid #141d36;font-family:'SF Mono','Fira Code',monospace;font-size:11px}
+.tp-user{color:#34d399;font-weight:700}.tp-path{color:#60a5fa}
+.tp-cursor{width:8px;height:15px;background:#22d3ee;border-radius:1px;
+  box-shadow:0 0 8px rgba(34,211,238,.6);animation:tblink 1.1s steps(1) infinite}
+@keyframes tblink{0%,50%{opacity:1}50.01%,100%{opacity:0}}
 
 /* ── MODAL ───────────────────────────────────────────── */
 .modal-overlay{position:fixed;inset:0;z-index:200;background:var(--modal-bg);
@@ -2448,20 +2496,24 @@ select.inp option{background:var(--card);color:var(--text)}
 
 <!-- ⑥ LOGS -->
 <div class="page" id="page-logs"><div class="pad">
-  <div class="card mb">
-    <div class="card-label">
-      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
-      Activity Log · <span id="log-count">0</span> entries
+  <div class="term">
+    <div class="term-bar">
+      <div class="term-dots"><i class="td-r"></i><i class="td-y"></i><i class="td-g"></i></div>
+      <div class="term-title">prolific@signals: ~/activity.log</div>
+      <div class="term-live"><span class="term-live-dot"></span><span id="log-count">0</span> LINES</div>
     </div>
-    <div class="fpills">
+    <div class="term-tabs">
       <span class="fpill active" onclick="filterLogs('all',this)">All</span>
       <span class="fpill" onclick="filterLogs('trade',this)">Trades</span>
       <span class="fpill" onclick="filterLogs('signal',this)">Signals</span>
-      <span class="fpill" onclick="filterLogs('multi',this)">Multi-Acct</span>
+      <span class="fpill" onclick="filterLogs('multi',this)">Multi</span>
       <span class="fpill" onclick="filterLogs('error',this)">Errors</span>
     </div>
+    <div class="log-box" id="log-box"><div class="log-line">Loading…</div></div>
+    <div class="term-prompt">
+      <span class="tp-user">prolific@signals</span><span class="tp-path">:~$</span><span class="tp-cursor"></span>
+    </div>
   </div>
-  <div class="log-box" id="log-box"><div class="log-line">Loading…</div></div>
 </div></div>
 
 <!-- ⑦ BACKTEST -->
