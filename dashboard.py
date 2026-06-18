@@ -944,6 +944,61 @@ def api_fear_greed():
         return jsonify({"value": None, "classification": "Unknown", "updated": 0})
 
 
+_bt_state: dict = {"running": False, "pct": 0, "msg": "", "result": None, "error": None}
+
+@app.route("/api/backtest", methods=["POST"])
+def api_backtest():
+    global _bt_state
+    if _bt_state["running"]:
+        return jsonify({"error": "Backtest already running", "pct": _bt_state["pct"]}), 409
+    import threading
+    d = request.get_json() or {}
+    threshold    = int(d.get("threshold", 55))
+    start_equity = float(d.get("start_equity", 10000))
+    use_ai       = bool(d.get("use_ai", False))
+
+    def _run():
+        global _bt_state
+        _bt_state = {"running": True, "pct": 0, "msg": "Starting…", "result": None, "error": None}
+        try:
+            from backtest import run_backtest
+            result = run_backtest(
+                score_threshold=threshold,
+                start_equity=start_equity,
+                use_ai_scoring=use_ai,
+                progress_cb=lambda p, m: _bt_state.update({"pct": p, "msg": m}),
+            )
+            _bt_state.update({"running": False, "pct": 100, "msg": "Done",
+                               "result": result, "error": result.get("error")})
+        except Exception as e:
+            _bt_state.update({"running": False, "pct": 0, "msg": str(e),
+                               "result": None, "error": str(e)})
+
+    threading.Thread(target=_run, daemon=True).start()
+    return jsonify({"started": True})
+
+
+@app.route("/api/backtest/status", methods=["GET"])
+def api_backtest_status():
+    s = _bt_state.copy()
+    # Don't send full result via polling — only summary
+    if s.get("result") and not s["running"]:
+        r = s["result"]
+        s["summary"] = {k: r[k] for k in (
+            "n_trades","win_rate","profit_factor","expectancy_r","max_dd_pct",
+            "sharpe","total_return_pct","prop_pass","n_signals_total",
+            "n_open_signals","n_scored_signals","score_threshold",
+        ) if k in r}
+    return jsonify(s)
+
+
+@app.route("/api/backtest/result", methods=["GET"])
+def api_backtest_result():
+    if not _bt_state.get("result"):
+        return jsonify({"error": "No result available yet"})
+    return jsonify(_bt_state["result"])
+
+
 @app.route("/api/set-sl-tp", methods=["POST"])
 def api_set_sl_tp():
     d      = request.get_json() or {}
@@ -2390,6 +2445,115 @@ select.inp option{background:var(--card);color:var(--text)}
   <div class="log-box" id="log-box"><div class="log-line">Loading…</div></div>
 </div></div>
 
+<!-- ⑦ BACKTEST -->
+<div class="page" id="page-backtest"><div class="pad">
+
+  <div class="card mb">
+    <div class="card-label">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline stroke-linecap="round" stroke-linejoin="round" points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Signal Backtester
+    </div>
+
+    <!-- Config -->
+    <div class="inp-grid mb" style="grid-template-columns:1fr 1fr">
+      <div class="inp-wrap">
+        <label class="inp-lbl">Score Threshold</label>
+        <input class="inp" type="number" id="bt-threshold" value="55" min="0" max="100">
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">Only run signals scoring ≥ this</div>
+      </div>
+      <div class="inp-wrap">
+        <label class="inp-lbl">Starting Equity (USDT)</label>
+        <input class="inp" type="number" id="bt-equity" value="10000" min="100">
+        <div style="font-size:10px;color:var(--text3);margin-top:3px">Simulated account size</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <label style="font-size:12px;font-weight:700">AI Scoring</label>
+      <label class="switch"><input type="checkbox" id="bt-use-ai"><span class="sw-track"></span></label>
+      <span style="font-size:10px;color:var(--text3)">Uses Claude API — slower, more accurate</span>
+    </div>
+    <button class="btn btn-primary" id="bt-run-btn" onclick="runBacktest()" style="margin-bottom:8px">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px"><polygon stroke-linecap="round" stroke-linejoin="round" points="5 3 19 12 5 21 5 3"/></svg>
+      Run Backtest
+    </button>
+
+    <!-- Progress bar -->
+    <div id="bt-progress-wrap" style="display:none;margin-top:10px">
+      <div style="height:6px;background:var(--border);border-radius:3px;overflow:hidden;margin-bottom:6px">
+        <div id="bt-progress-bar" style="height:100%;background:var(--accent);border-radius:3px;width:0%;transition:width .4s ease"></div>
+      </div>
+      <div id="bt-progress-msg" style="font-size:11px;color:var(--text3);text-align:center">—</div>
+    </div>
+  </div>
+
+  <!-- Results (hidden until run) -->
+  <div id="bt-results" style="display:none">
+
+    <!-- Prop Firm verdict -->
+    <div id="bt-prop-banner" style="border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:12px;font-weight:700"></div>
+
+    <!-- KPI cards row 1 -->
+    <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:10px">
+      <div class="stat-box"><div class="stat-num" id="bt-winrate" style="color:var(--accent2)">—</div><div class="stat-lbl">Win Rate</div></div>
+      <div class="stat-box"><div class="stat-num" id="bt-pf"      style="color:var(--green)">—</div><div class="stat-lbl">Profit Factor</div></div>
+      <div class="stat-box"><div class="stat-num" id="bt-exp"     style="color:var(--cyan)">—</div><div class="stat-lbl">Expectancy R</div></div>
+    </div>
+    <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:12px">
+      <div class="stat-box"><div class="stat-num" id="bt-dd"      style="color:var(--red)">—</div><div class="stat-lbl">Max Drawdown</div></div>
+      <div class="stat-box"><div class="stat-num" id="bt-sharpe"  style="color:var(--accent2)">—</div><div class="stat-lbl">Sharpe</div></div>
+      <div class="stat-box"><div class="stat-num" id="bt-return"  style="color:var(--green)">—</div><div class="stat-lbl">Total Return</div></div>
+    </div>
+    <div class="stat-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+      <div class="stat-box"><div class="stat-num" id="bt-ntrades">—</div><div class="stat-lbl">Trades</div></div>
+      <div class="stat-box"><div class="stat-num" id="bt-consec"  style="color:var(--red)">—</div><div class="stat-lbl">Max Consec Loss</div></div>
+      <div class="stat-box"><div class="stat-num" id="bt-hold">—</div><div class="stat-lbl">Avg Hold (h)</div></div>
+    </div>
+
+    <!-- Equity curve -->
+    <div class="card mb" style="padding:12px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:8px">Equity Curve</div>
+      <svg id="bt-equity-svg" viewBox="0 0 360 100" style="width:100%;height:100px;overflow:visible">
+        <defs>
+          <linearGradient id="bt-eq-grad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--accent)" stop-opacity=".3"/>
+            <stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/>
+          </linearGradient>
+        </defs>
+        <path id="bt-eq-fill" d="" fill="url(#bt-eq-grad)"/>
+        <polyline id="bt-eq-line" points="" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <text id="bt-eq-start" x="4" y="96" font-size="8" fill="var(--text3)">—</text>
+        <text id="bt-eq-end"   x="356" y="96" font-size="8" fill="var(--text3)" text-anchor="end">—</text>
+      </svg>
+    </div>
+
+    <!-- Direction breakdown -->
+    <div class="card mb" style="padding:12px" id="bt-dir-card">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:10px">Long vs Short</div>
+      <div id="bt-dir-body" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px"></div>
+    </div>
+
+    <!-- Symbol breakdown -->
+    <div class="card mb" style="padding:12px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:10px">By Symbol</div>
+      <div id="bt-sym-body" style="font-size:11px"></div>
+    </div>
+
+    <!-- Monthly breakdown -->
+    <div class="card mb" style="padding:12px" id="bt-month-card">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:10px">Monthly PnL (R)</div>
+      <div id="bt-month-body" style="font-size:11px"></div>
+    </div>
+
+    <!-- Trade list -->
+    <div class="card mb" style="padding:12px">
+      <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text3);margin-bottom:10px">Trade Log</div>
+      <div id="bt-trade-list" style="font-size:10.5px"></div>
+    </div>
+
+  </div><!-- /bt-results -->
+
+</div></div><!-- /page-backtest -->
+
 </div><!-- /pages -->
 
 <!-- BOTTOM NAV -->
@@ -2417,6 +2581,10 @@ select.inp option{background:var(--card);color:var(--text)}
   <button class="nav-btn" id="nav-logs" onclick="goTab('logs')">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
     <span>Logs</span><span class="tab-line"></span>
+  </button>
+  <button class="nav-btn" id="nav-backtest" onclick="goTab('backtest')">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline stroke-linecap="round" stroke-linejoin="round" points="1 4 1 10 7 10"/><polyline stroke-linecap="round" stroke-linejoin="round" points="23 20 23 14 17 14"/><path stroke-linecap="round" stroke-linejoin="round" d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"/></svg>
+    <span>Backtest</span><span class="tab-line"></span>
   </button>
 </nav>
 </div><!-- /app -->
@@ -5229,6 +5397,183 @@ setInterval(loadTicker, 60000);
 setInterval(loadMomentumAlerts, 300000);
 setInterval(fetchFearGreed, 300000);
 setInterval(fetchRiskGuard, 30000);
+
+/* ── Backtester ──────────────────────────────────────────── */
+let _btPollTimer = null;
+let _btResult    = null;
+
+async function runBacktest() {
+  const threshold   = parseInt(document.getElementById('bt-threshold').value) || 55;
+  const startEquity = parseFloat(document.getElementById('bt-equity').value)  || 10000;
+  const useAi       = document.getElementById('bt-use-ai').checked;
+
+  document.getElementById('bt-run-btn').disabled   = true;
+  document.getElementById('bt-results').style.display = 'none';
+  document.getElementById('bt-progress-wrap').style.display = 'block';
+  _setBtProgress(2, 'Starting…');
+
+  const r = await fetch('/api/backtest', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({threshold, start_equity: startEquity, use_ai: useAi})
+  });
+  const d = await r.json();
+  if (!r.ok || d.error) {
+    _setBtProgress(0, '❌ ' + (d.error || 'Failed to start'));
+    document.getElementById('bt-run-btn').disabled = false;
+    return;
+  }
+  _btPollTimer = setInterval(_pollBacktest, 1500);
+}
+
+async function _pollBacktest() {
+  const r = await fetch('/api/backtest/status');
+  const d = await r.json();
+  _setBtProgress(d.pct || 0, d.msg || '…');
+
+  if (!d.running && (d.result || d.error)) {
+    clearInterval(_btPollTimer); _btPollTimer = null;
+    document.getElementById('bt-run-btn').disabled = false;
+    if (d.error && !d.result) {
+      _setBtProgress(0, '❌ ' + d.error); return;
+    }
+    // Fetch full result
+    const fr = await fetch('/api/backtest/result');
+    _btResult = await fr.json();
+    if (_btResult.error) { _setBtProgress(0, '❌ ' + _btResult.error); return; }
+    _renderBacktestResults(_btResult);
+  }
+}
+
+function _setBtProgress(pct, msg) {
+  document.getElementById('bt-progress-bar').style.width = pct + '%';
+  document.getElementById('bt-progress-msg').textContent = msg;
+}
+
+function _renderBacktestResults(r) {
+  document.getElementById('bt-results').style.display = 'block';
+  document.getElementById('bt-progress-wrap').style.display = 'none';
+
+  // KPIs
+  const _set = (id, val) => { const el = document.getElementById(id); if(el) el.textContent = val; };
+  _set('bt-winrate',  r.win_rate?.toFixed(1) + '%');
+  _set('bt-pf',       r.profit_factor === 999 ? '∞' : r.profit_factor?.toFixed(2));
+  _set('bt-exp',      (r.expectancy_r >= 0 ? '+' : '') + r.expectancy_r?.toFixed(3) + 'R');
+  _set('bt-dd',       r.max_dd_pct?.toFixed(1) + '%');
+  _set('bt-sharpe',   r.sharpe?.toFixed(2));
+  _set('bt-return',   (r.total_return_pct >= 0 ? '+' : '') + r.total_return_pct?.toFixed(1) + '%');
+  _set('bt-ntrades',  r.n_trades + ' (' + r.n_wins + 'W/' + r.n_losses + 'L)');
+  _set('bt-consec',   r.max_consec_losses);
+  _set('bt-hold',     r.avg_hold_hours?.toFixed(1) + 'h');
+
+  // Prop firm banner
+  const banner = document.getElementById('bt-prop-banner');
+  if (r.prop_pass) {
+    banner.style.cssText = 'background:rgba(52,211,153,.12);border:1.5px solid rgba(52,211,153,.4);border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:12px;font-weight:700;color:var(--green)';
+    banner.innerHTML = '✅ PROP FIRM PASS — Max DD ' + r.max_dd_pct?.toFixed(1) + '% · ' + (r.prop_daily_violations?.length || 0) + ' daily violations · Profit Factor ' + r.profit_factor;
+  } else {
+    const viols = r.prop_daily_violations?.length || 0;
+    banner.style.cssText = 'background:rgba(239,68,68,.10);border:1.5px solid rgba(239,68,68,.3);border-radius:12px;padding:12px 16px;margin-bottom:12px;font-size:12px;font-weight:700;color:var(--red)';
+    banner.innerHTML = '⛔ PROP FIRM RISK — DD ' + r.max_dd_pct?.toFixed(1) + '% · ' + viols + ' day(s) exceeded 5% daily loss limit';
+  }
+
+  // Equity curve
+  _drawEquityCurve(r.equity_curve || [], r.start_equity);
+
+  // Direction breakdown
+  const dirBody = document.getElementById('bt-dir-body');
+  if (dirBody && r.by_direction) {
+    dirBody.innerHTML = Object.entries(r.by_direction).map(([dir,v]) =>
+      `<div style="background:var(--card2);border-radius:10px;padding:10px">
+        <div style="font-weight:800;margin-bottom:4px">${dir}</div>
+        <div style="color:var(--text3);font-size:10px">${v.n} trades</div>
+        <div style="font-size:16px;font-weight:900;color:${v.win_rate>=50?'var(--green)':'var(--red)'}">${v.win_rate}%</div>
+        <div style="font-size:10px;color:var(--text3)">${v.avg_r>0?'+':''}${v.avg_r}R avg</div>
+      </div>`
+    ).join('');
+  }
+
+  // Symbol breakdown
+  const symBody = document.getElementById('bt-sym-body');
+  if (symBody && r.by_symbol) {
+    symBody.innerHTML = Object.entries(r.by_symbol).map(([sym,v]) => {
+      const barW = Math.min(Math.abs(v.avg_r) * 40, 100);
+      const barC = v.avg_r > 0 ? 'var(--green)' : 'var(--red)';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+        <div style="width:90px;font-weight:800;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${sym.replace('USDT','')}</div>
+        <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
+          <div style="width:${barW}%;height:100%;background:${barC};border-radius:3px"></div>
+        </div>
+        <div style="width:32px;text-align:right;color:${v.win_rate>=50?'var(--green)':'var(--red)';}" >${v.win_rate}%</div>
+        <div style="width:40px;text-align:right;color:var(--text3)">${v.n}T</div>
+        <div style="width:44px;text-align:right;color:${v.avg_r>0?'var(--green)':'var(--red)'}">${v.avg_r>0?'+':''}${v.avg_r}R</div>
+      </div>`;
+    }).join('');
+  }
+
+  // Monthly breakdown
+  const monthBody = document.getElementById('bt-month-body');
+  if (monthBody && r.by_month) {
+    monthBody.innerHTML = Object.entries(r.by_month).map(([month,v]) =>
+      `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)">
+        <span style="font-weight:800">${month}</span>
+        <span style="color:var(--text3)">${v.n} trades</span>
+        <span style="color:${v.win_rate>=50?'var(--green)':'var(--red)'};font-weight:800">${v.win_rate}% WR</span>
+        <span style="color:${v.total_r>=0?'var(--green)':'var(--red)'};font-weight:700">${v.total_r>=0?'+':''}${v.total_r?.toFixed(2)}R</span>
+      </div>`
+    ).join('');
+  }
+
+  // Trade list
+  const trades = r.trades || [];
+  const tBody  = document.getElementById('bt-trade-list');
+  if (tBody) {
+    const rows = trades.map(t => {
+      const isWin = t.r_achieved > 0;
+      const oc    = t.outcome;
+      const clr   = isWin ? 'var(--green)' : (oc==='no_data'||oc==='no_levels') ? 'var(--text3)' : 'var(--red)';
+      const badge = oc === 'win' ? '✅' : oc === 'loss' ? '❌' : oc === 'open_win' ? '📈' : oc === 'open_loss' ? '📉' : '⚪';
+      return `<div style="display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border)">
+        <span style="width:18px;text-align:center">${badge}</span>
+        <span style="width:72px;font-weight:800;font-size:10px">${(t.symbol||'').replace('USDT','')}</span>
+        <span style="width:28px;font-size:9px;padding:1px 4px;border-radius:4px;background:${t.side==='Buy'?'var(--greenbg)':'rgba(239,68,68,.15)'};color:${t.side==='Buy'?'var(--green)':'var(--red)'}">${t.side==='Buy'?'L':'S'}</span>
+        <span style="width:34px;font-size:9px;color:var(--text3)">${t.score||'?'}</span>
+        <span style="flex:1;text-align:right;font-weight:800;color:${clr}">${t.r_achieved>0?'+':''}${t.r_achieved?.toFixed(2)}R</span>
+        <span style="width:32px;text-align:right;font-size:9px;color:var(--text3)">${t.hold_hours||0}h</span>
+      </div>`;
+    });
+    tBody.innerHTML = rows.join('') || '<div style="color:var(--text3);text-align:center;padding:16px">No trades</div>';
+  }
+}
+
+function _drawEquityCurve(curve, startEq) {
+  if (!curve || curve.length < 2) return;
+  const svg    = document.getElementById('bt-equity-svg');
+  const W = 360, H = 100, PAD = 10;
+  const minV = Math.min(...curve);
+  const maxV = Math.max(...curve);
+  const range = maxV - minV || 1;
+  const pts   = curve.map((v, i) => {
+    const x = PAD + (i / (curve.length - 1)) * (W - PAD * 2);
+    const y = H - PAD - ((v - minV) / range) * (H - PAD * 2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const lineEl = document.getElementById('bt-eq-line');
+  const fillEl = document.getElementById('bt-eq-fill');
+  if (lineEl) lineEl.setAttribute('points', pts.join(' '));
+  // Filled area
+  const firstX = PAD, lastX = W - PAD;
+  const bottomY = H - PAD;
+  const fillPts = `${firstX},${bottomY} ${pts.join(' ')} ${lastX},${bottomY}`;
+  if (fillEl) fillEl.setAttribute('d', `M ${firstX} ${bottomY} L ${pts.join(' L ')} L ${lastX} ${bottomY} Z`);
+  // Labels
+  const startEl = document.getElementById('bt-eq-start');
+  const endEl   = document.getElementById('bt-eq-end');
+  const last    = curve[curve.length - 1];
+  if (startEl) startEl.textContent = '$' + (startEq||0).toLocaleString();
+  if (endEl)   endEl.textContent   = '$' + last.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:0});
+  // Colour line by outcome
+  if (lineEl) lineEl.setAttribute('stroke', last >= (startEq||0) ? 'var(--green)' : 'var(--red)');
+}
 </script>
 
 <!-- ── Risk Strategy Detail Sheet ── -->
