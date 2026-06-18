@@ -1975,6 +1975,17 @@ select.inp option{background:var(--card);color:var(--text)}
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
       <div style="font-size:10px;font-weight:800;letter-spacing:.08em;color:var(--text3)">RISK GUARD</div>
       <div style="display:flex;align-items:center;gap:6px">
+        <button onclick="toggleRgVis()" id="rg-vis-btn" title="Hide/show Daily PnL"
+          style="background:var(--card2);border:1px solid var(--border);border-radius:6px;
+          padding:2px 7px;cursor:pointer;display:flex;align-items:center;gap:4px;
+          font-size:9px;font-weight:800;color:var(--text3)">
+          <svg id="rg-vis-icon" width="12" height="12" fill="none" viewBox="0 0 24 24"
+            stroke="currentColor" stroke-width="2.2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+            <circle cx="12" cy="12" r="3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span id="rg-vis-lbl">Hide</span>
+        </button>
         <div id="rg-status-pill" style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:6px;
           background:rgba(52,199,89,.15);color:#34C759">TRADING OK</div>
         <button onclick="rgReset()" id="rg-reset-btn" style="display:none;background:rgba(255,59,48,.15);
@@ -3782,8 +3793,42 @@ function _applyBalVis() {
   }
 }
 
+/* ── Risk Guard PnL visibility ───────────────────────── */
+let _rgVisible = localStorage.getItem('rgVis') !== '0';
+
+function toggleRgVis() {
+  _rgVisible = !_rgVisible;
+  localStorage.setItem('rgVis', _rgVisible ? '1' : '0');
+  _applyRgVis();
+}
+
+function _applyRgVis() {
+  const ids  = ['rg-daily-pnl', 'rg-daily-pct'];
+  const mask = '••••';
+  const lbl  = document.getElementById('rg-vis-lbl');
+  const icon = document.getElementById('rg-vis-icon');
+  if (!lbl) return;
+  if (_rgVisible) {
+    lbl.textContent = 'Hide';
+    icon.innerHTML  = `<path stroke-linecap="round" stroke-linejoin="round"
+      d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+      <circle cx="12" cy="12" r="3" stroke-linecap="round" stroke-linejoin="round"/>`;
+    ids.forEach(id => { const el = document.getElementById(id);
+      if (el && el.dataset.real) el.textContent = el.dataset.real; });
+  } else {
+    lbl.textContent = 'Show';
+    icon.innerHTML  = `<path stroke-linecap="round" stroke-linejoin="round"
+      d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+      <path stroke-linecap="round" stroke-linejoin="round"
+        d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+      <line x1="1" y1="1" x2="23" y2="23" stroke-linecap="round"/>`;
+    ids.forEach(id => { const el = document.getElementById(id); if (el) el.textContent = mask; });
+  }
+}
+
 function _restorePanels() {
   _applyBalVis();
+  _applyRgVis();
   if (localStorage.getItem('mkt_panel') === '1') {
     document.getElementById('market-panel').style.display = 'grid';
     document.getElementById('mkt-toggle-btn').textContent = 'Hide ▴';
@@ -5292,8 +5337,9 @@ async function fetchRiskGuard() {
     const pnlEl  = document.getElementById('rg-daily-pnl');
     const pctEl  = document.getElementById('rg-daily-pct');
     const pnlCol = pnl >= 0 ? 'var(--green)' : 'var(--red)';
-    if (pnlEl) { pnlEl.textContent = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + ' USDT'; pnlEl.style.color = pnlCol; }
-    if (pctEl) { pctEl.textContent = (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%'; pctEl.style.color = pnlCol; }
+    if (pnlEl) { pnlEl.dataset.real = (pnl >= 0 ? '+' : '') + pnl.toFixed(2) + ' USDT'; pnlEl.style.color = pnlCol; }
+    if (pctEl) { pctEl.dataset.real = (pnlPct >= 0 ? '+' : '') + pnlPct.toFixed(2) + '%'; pctEl.style.color = pnlCol; }
+    _applyRgVis();
 
     // DD Limit
     const ddEl = document.getElementById('rg-dd-limit');
