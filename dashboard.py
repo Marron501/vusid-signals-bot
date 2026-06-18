@@ -2534,20 +2534,38 @@ select.inp option{background:var(--card);color:var(--text)}
         <span style="font-size:10px;color:var(--text3)" id="sltp-cur-sl">current: —</span>
       </div>
       <div style="display:flex;gap:6px">
-        <input class="inp" id="sltp-sl-inp" type="number" step="any" placeholder="Price (0 to clear)" style="flex:1;font-size:14px"/>
+        <input class="inp" id="sltp-sl-inp" type="number" step="any" placeholder="Price (0 to clear)"
+          style="flex:1;font-size:14px" oninput="updateSltpPnl()"/>
         <button class="btn btn-ghost btn-sm" onclick="clearSLTP('sl')" style="width:auto;padding:0 12px;font-size:11px;color:var(--text3)">Clear</button>
       </div>
     </div>
 
     <!-- TP row -->
-    <div style="margin-bottom:16px">
+    <div style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px">
         <label style="font-size:11px;font-weight:700;color:var(--green)">🎯 Take Profit</label>
         <span style="font-size:10px;color:var(--text3)" id="sltp-cur-tp">current: —</span>
       </div>
       <div style="display:flex;gap:6px">
-        <input class="inp" id="sltp-tp-inp" type="number" step="any" placeholder="Price (0 to clear)" style="flex:1;font-size:14px"/>
+        <input class="inp" id="sltp-tp-inp" type="number" step="any" placeholder="Price (0 to clear)"
+          style="flex:1;font-size:14px" oninput="updateSltpPnl()"/>
         <button class="btn btn-ghost btn-sm" onclick="clearSLTP('tp')" style="width:auto;padding:0 12px;font-size:11px;color:var(--text3)">Clear</button>
+      </div>
+    </div>
+
+    <!-- Live P&L preview -->
+    <div id="sltp-pnl-box" style="display:none;border-radius:12px;overflow:hidden;margin-bottom:12px;font-size:12px">
+      <div style="display:flex">
+        <div id="sltp-sl-pnl" style="flex:1;padding:10px 12px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25);border-radius:10px 0 0 10px">
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--red);margin-bottom:3px">Max Loss (SL)</div>
+          <div id="sltp-sl-amt" style="font-size:18px;font-weight:900;color:var(--red);letter-spacing:-.3px">—</div>
+          <div id="sltp-sl-pct" style="font-size:10px;color:var(--red);opacity:.7;margin-top:1px">—</div>
+        </div>
+        <div id="sltp-tp-pnl" style="flex:1;padding:10px 12px;background:rgba(52,211,153,.10);border:1px solid rgba(52,211,153,.25);border-radius:0 10px 10px 0;border-left:none">
+          <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.6px;color:var(--green);margin-bottom:3px">Target Gain (TP)</div>
+          <div id="sltp-tp-amt" style="font-size:18px;font-weight:900;color:var(--green);letter-spacing:-.3px">—</div>
+          <div id="sltp-tp-rr" style="font-size:10px;color:var(--green);opacity:.7;margin-top:1px">—</div>
+        </div>
       </div>
     </div>
 
@@ -3310,6 +3328,58 @@ function openSLTP(idx) {
   const demoNote = p.is_demo ? ' (Demo)' : '';
   document.getElementById('sltp-mode-lbl').textContent = `SL / TP · ${p.symbol}${demoNote}`;
   document.getElementById('sltp-overlay').classList.add('open');
+  updateSltpPnl();
+}
+
+function updateSltpPnl() {
+  const p = _sltpPending;
+  if (!p) return;
+  const entry   = parseFloat(p.entry) || 0;
+  const size    = parseFloat(p.size)  || 0;
+  const isLong  = p.side === 'Buy';
+  const slPrice = parseFloat(document.getElementById('sltp-sl-inp').value);
+  const tpPrice = parseFloat(document.getElementById('sltp-tp-inp').value);
+  const box     = document.getElementById('sltp-pnl-box');
+
+  if (!entry || !size || (!slPrice && !tpPrice)) { box.style.display = 'none'; return; }
+  box.style.display = 'block';
+
+  // SL P&L
+  const slAmt = document.getElementById('sltp-sl-amt');
+  const slPct = document.getElementById('sltp-sl-pct');
+  if (slPrice > 0) {
+    const slLoss = isLong ? (slPrice - entry) * size : (entry - slPrice) * size;
+    const slPctV = ((slPrice - entry) / entry * (isLong ? 1 : -1)) * 100;
+    slAmt.textContent = (slLoss >= 0 ? '+' : '') + _fmt$(slLoss) + ' USDT';
+    slAmt.style.color = slLoss < 0 ? 'var(--red)' : 'var(--green)';
+    slPct.textContent = (slPctV >= 0 ? '+' : '') + slPctV.toFixed(2) + '% on position';
+  } else {
+    slAmt.textContent = '—';
+    slPct.textContent = 'not set';
+  }
+
+  // TP P&L
+  const tpAmt = document.getElementById('sltp-tp-amt');
+  const tpRR  = document.getElementById('sltp-tp-rr');
+  if (tpPrice > 0) {
+    const tpGain = isLong ? (tpPrice - entry) * size : (entry - tpPrice) * size;
+    const tpPctV = ((tpPrice - entry) / entry * (isLong ? 1 : -1)) * 100;
+    tpAmt.textContent = (tpGain >= 0 ? '+' : '') + _fmt$(tpGain) + ' USDT';
+    tpAmt.style.color = tpGain > 0 ? 'var(--green)' : 'var(--red)';
+    // R:R ratio
+    if (slPrice > 0) {
+      const slDist = Math.abs(entry - slPrice);
+      const tpDist = Math.abs(tpPrice - entry);
+      const rr = slDist > 0 ? tpDist / slDist : null;
+      tpRR.textContent = rr ? `${tpPctV.toFixed(2)}% · R:R 1:${rr.toFixed(2)}` : `${tpPctV.toFixed(2)}% on position`;
+      tpRR.style.color = rr >= 2 ? 'var(--green)' : rr >= 1 ? '#f59e0b' : 'var(--red)';
+    } else {
+      tpRR.textContent = tpPctV.toFixed(2) + '% on position';
+    }
+  } else {
+    tpAmt.textContent = '—';
+    tpRR.textContent  = 'not set';
+  }
 }
 
 function clearSLTP(type) {
@@ -3318,6 +3388,7 @@ function clearSLTP(type) {
 
 function cancelSLTP() {
   document.getElementById('sltp-overlay').classList.remove('open');
+  document.getElementById('sltp-pnl-box').style.display = 'none';
   _sltpPending = null;
 }
 
