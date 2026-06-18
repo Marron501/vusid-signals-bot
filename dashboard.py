@@ -5511,7 +5511,7 @@ function _renderBacktestResults(r) {
         <div style="flex:1;height:6px;background:var(--border);border-radius:3px;overflow:hidden">
           <div style="width:${barW}%;height:100%;background:${barC};border-radius:3px"></div>
         </div>
-        <div style="width:32px;text-align:right;color:${v.win_rate>=50?'var(--green)':'var(--red)';}" >${v.win_rate}%</div>
+        <div style="width:32px;text-align:right;color:${v.win_rate>=50?'var(--green)':'var(--red)'}" >${v.win_rate}%</div>
         <div style="width:40px;text-align:right;color:var(--text3)">${v.n}T</div>
         <div style="width:44px;text-align:right;color:${v.avg_r>0?'var(--green)':'var(--red)'}">${v.avg_r>0?'+':''}${v.avg_r}R</div>
       </div>`;
