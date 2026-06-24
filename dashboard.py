@@ -127,8 +127,24 @@ def _momentum_monitor_loop():
                         _momentum_alerts.insert(0, alert)
                         if len(_momentum_alerts) > 50:
                             _momentum_alerts.pop()
-                        from signal_listener import _push_sse
+                        from signal_listener import _push_sse, send_owner_dm
                         _push_sse(alert)
+                        # Owner DM notification (thread-safe bridge into the Discord loop)
+                        try:
+                            _urg_icon = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(alert["urgency"], "🟡")
+                            _act_lbl  = {"close_now": "CLOSE NOW", "close_soon": "CLOSE SOON",
+                                         "monitor": "Monitor"}.get(alert["action"], alert["action"])
+                            _dir = "LONG" if alert["side"] == "Buy" else "SHORT"
+                            send_owner_dm(
+                                f"{_urg_icon} **Momentum Alert — {_act_lbl}**\n"
+                                f"────────────────────\n"
+                                f"**{alert['symbol']}** {_dir} · {alert['account'] or 'Primary'}\n"
+                                f"Unrealised PnL: `{alert['pnl']:.2f}` USDT\n"
+                                f"{alert['reason'][:300]}\n"
+                                f"_AI never auto-closes — confirm from the dashboard._"
+                            )
+                        except Exception as _dm_e:
+                            log.debug(f"[MOMENTUM] DM error: {_dm_e}")
                         log.warning(
                             f"[MOMENTUM] {alert['symbol']} {alert['side']} — "
                             f"{alert['action']} ({alert['urgency']}) | {alert['reason'][:80]}"

@@ -41,6 +41,33 @@ def _push_sse(event: dict) -> None:
     except Exception:
         pass
 
+
+# ── Cross-thread DM bridge ────────────────────────────────────────────────────
+# The Discord client runs in its own asyncio loop. Background threads (e.g. the
+# momentum monitor) can deliver an owner DM through this reference safely.
+_RUNNING_CLIENT = None  # set in on_ready
+
+
+def send_owner_dm(message: str) -> bool:
+    """
+    Thread-safe owner DM. Callable from any thread (not just the Discord loop).
+    Returns True if the coroutine was scheduled, False otherwise. Best-effort.
+    """
+    client = _RUNNING_CLIENT
+    if client is None:
+        logger.debug("[dm] no running Discord client yet — DM skipped")
+        return False
+    loop = getattr(client, "loop", None)
+    if loop is None or not loop.is_running():
+        logger.debug("[dm] Discord loop not running — DM skipped")
+        return False
+    try:
+        asyncio.run_coroutine_threadsafe(client._dm_owner(message), loop)
+        return True
+    except Exception as e:
+        logger.warning(f"[dm] send_owner_dm failed: {e}")
+        return False
+
 CHANNEL_WINS  = 38
 CHANNEL_TOTAL = 44
 MIN_WIN_RATE  = 0.70
@@ -510,6 +537,9 @@ class DiscordSignalClient(discord.Client):
     async def on_ready(self):
         self._connect_count += 1
         self._signal_queue = asyncio.Queue()
+
+        global _RUNNING_CLIENT
+        _RUNNING_CLIENT = self  # expose for cross-thread owner DMs (momentum monitor)
 
         logger.info(f"Discord connected as {self.user} (connect #{self._connect_count})")
         logger.info(f"Listening to #{self.signal_channel_name}")
