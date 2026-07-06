@@ -49,8 +49,8 @@ def _save(items: list[dict]) -> None:
 # ── public API (called from the signal listener at the filter point) ──────────
 def add_filtered_signal(signal: dict, score: int, gate: int, phase_label: str) -> None:
     """Register an AI-score-filtered signal to be watched for a recovered entry."""
-    if not config.COPYBOT_WEBHOOK_URL:
-        return  # feature disabled — no webhook configured
+    if not config.COPYBOT_ALERTS:
+        return  # feature disabled
     try:
         sym  = signal.get("symbol", "")
         side = signal.get("side", "")
@@ -106,6 +106,51 @@ def _post_webhook(title: str, description: str, color: int, fields: list[dict]) 
         return False
 
 
+# ── delivery ──────────────────────────────────────────────────────────────────
+def _notify_entry_window(it: dict, score: int, res: dict) -> bool:
+    """
+    Deliver an 'entry window open' alert. Default channel is the owner DM
+    (the CopyBot APP DM thread). If COPYBOT_WEBHOOK_URL is set, a channel
+    webhook is used instead.
+    """
+    sig     = it["signal"]
+    dir_lbl = "LONG" if it["side"] == "Buy" else "SHORT"
+
+    if config.COPYBOT_WEBHOOK_URL:
+        return _post_webhook(
+            title=f"✅ Entry Window Open — {it['symbol']} {dir_lbl}",
+            description=("A signal previously filtered by AI score has recovered to the "
+                         "entry threshold. Consider taking the trade."),
+            color=0x34D399,
+            fields=[
+                {"name": "Score",       "value": f"{it['orig_score']} → **{score}** (gate {int(it.get('gate',60))})", "inline": True},
+                {"name": "Direction",   "value": dir_lbl, "inline": True},
+                {"name": "Phase",       "value": str(it.get("phase", "—")), "inline": True},
+                {"name": "Take Profit", "value": str(sig.get("take_profit") or "—"), "inline": True},
+                {"name": "Stop Loss",   "value": str(sig.get("stop_loss") or "—"), "inline": True},
+                {"name": "Verdict",     "value": str(res.get("verdict", "—")), "inline": True},
+            ],
+        )
+
+    # Default: owner DM (thread-safe bridge into the running Discord client)
+    try:
+        from signal_listener import send_owner_dm
+        msg = (
+            f"✅ **Entry Window Open — CopyBot**\n"
+            f"────────────────────\n"
+            f"**{it['symbol']}** {dir_lbl} · {it.get('phase','—')}\n"
+            f"AI Score: `{it['orig_score']} → {score}` (gate {int(it.get('gate',60))})\n"
+            f"Take Profit: `{sig.get('take_profit') or '—'}`  ·  Stop Loss: `{sig.get('stop_loss') or '—'}`\n"
+            f"Verdict: `{res.get('verdict','—')}`\n"
+            f"_A signal earlier filtered by AI score has recovered — consider taking it. "
+            f"Notification only; not auto-traded._"
+        )
+        return bool(send_owner_dm(msg))
+    except Exception as e:
+        logger.error(f"[copybot] DM delivery failed: {e}")
+        return False
+
+
 # ── monitor loop ──────────────────────────────────────────────────────────────
 def _tick() -> None:
     items = _load()
@@ -147,24 +192,9 @@ def _tick() -> None:
 
         if score >= gate:
             # 3) entry window open → notify, then drop from the watchlist
-            sig     = it["signal"]
-            dir_lbl = "LONG" if it["side"] == "Buy" else "SHORT"
-            ok = _post_webhook(
-                title=f"✅ Entry Window Open — {it['symbol']} {dir_lbl}",
-                description=("A signal previously filtered by AI score has recovered to the "
-                             "entry threshold. Consider taking the trade."),
-                color=0x34D399,
-                fields=[
-                    {"name": "Score",       "value": f"{it['orig_score']} → **{score}** (gate {gate})", "inline": True},
-                    {"name": "Direction",   "value": dir_lbl, "inline": True},
-                    {"name": "Phase",       "value": str(it.get("phase", "—")), "inline": True},
-                    {"name": "Take Profit", "value": str(sig.get("take_profit") or "—"), "inline": True},
-                    {"name": "Stop Loss",   "value": str(sig.get("stop_loss") or "—"), "inline": True},
-                    {"name": "Verdict",     "value": str(res.get("verdict", "—")), "inline": True},
-                ],
-            )
+            ok = _notify_entry_window(it, score, res)
             logger.warning(
-                f"[copybot] ENTRY WINDOW {it['key']} score {it['orig_score']}→{score} (posted={ok})"
+                f"[copybot] ENTRY WINDOW {it['key']} score {it['orig_score']}→{score} (sent={ok})"
             )
             changed = True
             # not appended to keep → removed from watchlist
@@ -179,7 +209,7 @@ def _watch_loop() -> None:
     time.sleep(150)  # give the bot time to start
     while True:
         try:
-            if config.COPYBOT_WEBHOOK_URL:
+            if config.COPYBOT_ALERTS:
                 _tick()
         except Exception as e:
             logger.error(f"[copybot] loop error: {e}")
@@ -194,7 +224,8 @@ def start_watcher() -> None:
         return
     _started = True
     threading.Thread(target=_watch_loop, daemon=True, name="copybot-watch").start()
-    if config.COPYBOT_WEBHOOK_URL:
-        logger.info(f"[copybot] watcher started — window {config.COPYBOT_WATCH_HOURS}h")
+    if config.COPYBOT_ALERTS:
+        dest = "channel webhook" if config.COPYBOT_WEBHOOK_URL else "owner DM"
+        logger.info(f"[copybot] watcher started — window {config.COPYBOT_WATCH_HOURS}h, via {dest}")
     else:
-        logger.info("[copybot] watcher started (idle — COPYBOT_WEBHOOK_URL not set)")
+        logger.info("[copybot] watcher started (disabled — COPYBOT_ALERTS=false)")

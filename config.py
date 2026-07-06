@@ -62,8 +62,12 @@ MIN_AI_SCORE     = int(os.getenv("MIN_AI_SCORE", "60"))
 # --- CopyBot re-entry watcher ------------------------------------------------
 # When a signal is filtered by the AI-score gate, it is watched for up to
 # COPYBOT_WATCH_HOURS and re-scored periodically. If its score later recovers
-# to the gate, an "entry window open" alert is POSTed to this Discord webhook.
-# Leave COPYBOT_WEBHOOK_URL empty to disable the feature entirely.
+# to the gate, an "entry window open" alert is delivered.
+# Delivery: by default the alert is sent as an owner DM (the same CopyBot APP
+# DM thread that already receives "Signal FILTERED" alerts). If you instead
+# set COPYBOT_WEBHOOK_URL to a Discord *channel* webhook, alerts POST there.
+# Set COPYBOT_ALERTS=false to disable the feature entirely.
+COPYBOT_ALERTS      = os.getenv("COPYBOT_ALERTS", "true").lower() in ("true", "1", "yes")
 COPYBOT_WEBHOOK_URL = os.getenv("COPYBOT_WEBHOOK_URL", "").strip()
 COPYBOT_WATCH_HOURS = float(os.getenv("COPYBOT_WATCH_HOURS", "12"))
 
