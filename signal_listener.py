@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 BASE            = Path(__file__).parent
 
 # ── Persistent file paths (volume-aware) ──────────────────────────────────────
-from paths import SIGNALS_FILE, PROCESSED_FILE, STATS_FILE
+from paths import SIGNALS_FILE, PROCESSED_FILE, STATS_FILE, DATA_DIR
 
 # ── SSE helper ────────────────────────────────────────────────────────────────
 
@@ -42,31 +42,59 @@ def _push_sse(event: dict) -> None:
         pass
 
 
-# ── Cross-thread DM bridge ────────────────────────────────────────────────────
-# The Discord client runs in its own asyncio loop. Background threads (e.g. the
-# momentum monitor) can deliver an owner DM through this reference safely.
-_RUNNING_CLIENT = None  # set in on_ready
+# ── Cross-thread / cross-process DM bridge ────────────────────────────────────
+# The Discord client runs in its OWN process (bot.py), separate from the web /
+# dashboard process that hosts the momentum monitor and CopyBot watcher. So a
+# DM can arrive two ways:
+#   1. In-process (a thread inside bot.py) → schedule directly on the loop.
+#   2. Cross-process (the web process) → append to a file outbox that the bot
+#      process drains and sends. This is the path the momentum + CopyBot alerts
+#      use, since they run in the web process.
+_RUNNING_CLIENT = None                       # set in on_ready (bot.py process only)
+_DM_OUTBOX      = DATA_DIR / "dm_outbox.json"
+_outbox_lock    = threading.Lock()
+
+
+def _queue_owner_dm(message: str) -> bool:
+    """Append a DM to the cross-process outbox for the bot process to send."""
+    try:
+        with _outbox_lock:
+            items = []
+            if _DM_OUTBOX.exists():
+                try:
+                    items = json.loads(_DM_OUTBOX.read_text())
+                except Exception:
+                    items = []
+            items.append({"ts": time.time(), "msg": message})
+            items = items[-50:]  # cap backlog
+            tmp = _DM_OUTBOX.with_suffix(".tmp")
+            tmp.write_text(json.dumps(items))
+            import os as _os
+            _os.replace(tmp, _DM_OUTBOX)       # atomic
+        return True
+    except Exception as e:
+        logger.error(f"[dm] outbox queue failed: {e}")
+        return False
 
 
 def send_owner_dm(message: str) -> bool:
     """
-    Thread-safe owner DM. Callable from any thread (not just the Discord loop).
-    Returns True if the coroutine was scheduled, False otherwise. Best-effort.
+    Deliver an owner DM from ANY thread or process.
+    In the bot process the Discord loop is used directly; elsewhere the message
+    is queued to a file outbox that the bot drains. Best-effort; returns True if
+    the DM was scheduled or queued.
     """
     client = _RUNNING_CLIENT
-    if client is None:
-        logger.debug("[dm] no running Discord client yet — DM skipped")
-        return False
-    loop = getattr(client, "loop", None)
-    if loop is None or not loop.is_running():
-        logger.debug("[dm] Discord loop not running — DM skipped")
-        return False
-    try:
-        asyncio.run_coroutine_threadsafe(client._dm_owner(message), loop)
-        return True
-    except Exception as e:
-        logger.warning(f"[dm] send_owner_dm failed: {e}")
-        return False
+    if client is not None:
+        loop = getattr(client, "loop", None)
+        if loop is not None and loop.is_running():
+            try:
+                asyncio.run_coroutine_threadsafe(client._dm_owner(message), loop)
+                return True
+            except Exception as e:
+                logger.warning(f"[dm] direct send failed, queueing instead: {e}")
+    # Cross-process (web/dashboard) — hand off to the bot via the outbox
+    return _queue_owner_dm(message)
 
 CHANNEL_WINS  = 38
 CHANNEL_TOTAL = 44
@@ -539,7 +567,7 @@ class DiscordSignalClient(discord.Client):
         self._signal_queue = asyncio.Queue()
 
         global _RUNNING_CLIENT
-        _RUNNING_CLIENT = self  # expose for cross-thread owner DMs (momentum monitor)
+        _RUNNING_CLIENT = self  # expose for in-process owner DMs
 
         logger.info(f"Discord connected as {self.user} (connect #{self._connect_count})")
         logger.info(f"Listening to #{self.signal_channel_name}")
@@ -553,6 +581,7 @@ class DiscordSignalClient(discord.Client):
         self.loop.create_task(self._signal_worker())
         self.loop.create_task(self._heartbeat_task())
         self.loop.create_task(self._daily_status_task())
+        self.loop.create_task(self._dm_outbox_task())
 
         # Recover any missed signals
         await self._recover_missed_signals()
@@ -1026,6 +1055,43 @@ class DiscordSignalClient(discord.Client):
             logger.info("DM sent to owner")
         except Exception as e:
             logger.warning(f"Could not send DM: {e}")
+
+    async def _dm_outbox_task(self):
+        """
+        Drain the cross-process DM outbox. The web/dashboard process (momentum
+        monitor, CopyBot watcher) queues owner DMs to a file; this task — running
+        in the bot process with the live Discord client — sends them. Polls ~15s.
+        """
+        import os as _os
+        while True:
+            try:
+                if _DM_OUTBOX.exists():
+                    # Atomically claim the outbox so new appends aren't lost
+                    claim = _DM_OUTBOX.with_suffix(".claim")
+                    items = []
+                    with _outbox_lock:
+                        try:
+                            _os.replace(_DM_OUTBOX, claim)
+                        except FileNotFoundError:
+                            claim = None
+                    if claim is not None:
+                        try:
+                            items = json.loads(claim.read_text())
+                        except Exception:
+                            items = []
+                        finally:
+                            try: claim.unlink()
+                            except Exception: pass
+                    for it in items:
+                        msg = it.get("msg", "") if isinstance(it, dict) else str(it)
+                        if msg:
+                            try:
+                                await self._dm_owner(msg)
+                            except Exception as e:
+                                logger.warning(f"[dm] outbox send error: {e}")
+            except Exception as e:
+                logger.debug(f"[dm] outbox task error: {e}")
+            await asyncio.sleep(15)
 
 
 # ─────────────────────────────────────────────
