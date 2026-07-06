@@ -768,6 +768,12 @@ class DiscordSignalClient(discord.Client):
                             f"Verdict: `{analysis.get('verdict','?')}`\n"
                             f"Reason: {analysis.get('summary','')[:120]}"
                         )
+                        # CopyBot: watch this filtered signal for a recovered entry
+                        try:
+                            from copybot_watch import add_filtered_signal
+                            add_filtered_signal(signal, score, effective_gate, phase_label)
+                        except Exception as _cbe:
+                            logger.debug(f"[copybot] register failed: {_cbe}")
                         continue
 
                 # ── Risk Guard: circuit breaker + position cap ────────────

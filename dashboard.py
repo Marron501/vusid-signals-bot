@@ -159,6 +159,11 @@ def _momentum_monitor_loop():
 threading.Thread(target=_run_bot_forever,      daemon=True, name="bot").start()
 threading.Thread(target=_keepalive_loop,       daemon=True, name="keepalive").start()
 threading.Thread(target=_momentum_monitor_loop, daemon=True, name="momentum").start()
+try:
+    from copybot_watch import start_watcher as _start_copybot
+    _start_copybot()
+except Exception as _cbw_e:
+    log.error(f"[copybot] failed to start watcher: {_cbw_e}")
 log.info(f"[PROLIFIC] Bot + keepalive threads started")
 log.info(f"[PROLIFIC] Data directory: {DATA_DIR}")
 log.info(f"[PROLIFIC] Signals file  : {SIGNALS_FILE}")
