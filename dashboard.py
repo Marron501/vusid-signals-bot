@@ -368,6 +368,28 @@ def api_momentum_alerts():
     return jsonify(_momentum_alerts[:20])
 
 
+@app.route("/api/copybot/test", methods=["GET", "POST"])
+def api_copybot_test():
+    """Fire a sample CopyBot 'Entry Window Open' DM to verify the delivery path."""
+    try:
+        from signal_listener import send_owner_dm
+        ok = send_owner_dm(
+            "✅ **Entry Window Open — CopyBot** _(test)_\n"
+            "────────────────────\n"
+            "**BTCUSDT** SHORT · Phase 1\n"
+            "AI Score: `52 → 63` (gate 60)\n"
+            "Take Profit: `—`  ·  Stop Loss: `—`\n"
+            "Verdict: `test`\n"
+            "_End-to-end delivery test of the CopyBot re-entry alert path. "
+            "Notification only; not auto-traded._"
+        )
+        return jsonify({"success": bool(ok), "sent": bool(ok),
+                        "note": "DM scheduled to owner (CopyBot APP thread)" if ok
+                                else "Discord client not ready — retry shortly"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)})
+
+
 @app.route("/api/reanalyze", methods=["POST"])
 def api_reanalyze():
     """Backfill AI analysis on any open-signal entries that don't have one yet."""
