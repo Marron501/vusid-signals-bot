@@ -410,7 +410,19 @@ def api_certification():
         "auto_execute_on":     cfg.AUTO_EXECUTE,
     }
 
+    # Raw env echo — tells us definitively whether Railway is passing the var
+    # through, rather than inferring it from the parsed value.
+    _raw_env = os.environ.get("MIN_WIN_RATE")
+    env_diag = {
+        "MIN_WIN_RATE_raw":     _raw_env,
+        "MIN_WIN_RATE_present": _raw_env is not None,
+        "parsed_gate":          cfg.MIN_WIN_RATE,
+        "similar_keys":         sorted(k for k in os.environ
+                                       if "WIN" in k.upper() or "RATE" in k.upper()),
+    }
+
     return jsonify({
+        "env_diag":       env_diag,
         "measured":       stats,
         "hardcoded":      hardcoded,
         "effective": {
