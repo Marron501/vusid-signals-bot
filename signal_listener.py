@@ -98,7 +98,8 @@ def send_owner_dm(message: str) -> bool:
 
 CHANNEL_WINS  = 38
 CHANNEL_TOTAL = 44
-MIN_WIN_RATE  = 0.70
+MIN_WIN_RATE  = config.MIN_WIN_RATE   # env-configurable; see config.py for the
+                                      # demo-accumulation deadlock this avoids
 
 SIGNAL_LOOKBACK_HOURS = 4   # Scan this far back for missed signals on reconnect
 MAX_SIGNAL_AGE_HOURS  = 2   # Don't execute signals older than this

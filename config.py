@@ -59,6 +59,14 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 # Set to 0 to disable the filter entirely.
 MIN_AI_SCORE     = int(os.getenv("MIN_AI_SCORE", "60"))
 
+# MIN_WIN_RATE: signals are skipped when the tracked win rate falls below this.
+# NOTE: get_win_rate() switches from the hardcoded channel figure to MEASURED
+# performance once >= 5 real trades are recorded. During a demo accumulation
+# run that creates a deadlock — a sub-threshold early sample blocks all further
+# signals, so the sample can never grow. Set MIN_WIN_RATE=0 while gathering the
+# first 30 trades, then restore it (0.70) before going live.
+MIN_WIN_RATE     = float(os.getenv("MIN_WIN_RATE", "0.70"))
+
 # --- CopyBot re-entry watcher ------------------------------------------------
 # When a signal is filtered by the AI-score gate, it is watched for up to
 # COPYBOT_WATCH_HOURS and re-scored periodically. If its score later recovers
