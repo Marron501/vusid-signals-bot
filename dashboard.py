@@ -164,6 +164,11 @@ try:
     _start_copybot()
 except Exception as _cbw_e:
     log.error(f"[copybot] failed to start watcher: {_cbw_e}")
+try:
+    from trade_recorder import start_recorder as _start_recorder
+    _start_recorder()
+except Exception as _rec_e:
+    log.error(f"[recorder] failed to start: {_rec_e}")
 log.info(f"[PROLIFIC] Bot + keepalive threads started")
 log.info(f"[PROLIFIC] Data directory: {DATA_DIR}")
 log.info(f"[PROLIFIC] Signals file  : {SIGNALS_FILE}")
@@ -366,6 +371,59 @@ def api_signals():
 @app.route("/api/momentum-alerts", methods=["GET"])
 def api_momentum_alerts():
     return jsonify(_momentum_alerts[:20])
+
+
+@app.route("/api/certification", methods=["GET"])
+def api_certification():
+    """
+    Ground-truth readiness report: measured performance vs the hardcoded
+    channel figure, and progress toward the live-trading checklist.
+    """
+    import config as cfg
+    try:
+        import trade_recorder as tr
+        history = tr.load_history()
+        stats   = tr.compute_stats(history)
+    except Exception as e:
+        return jsonify({"error": f"recorder unavailable: {e}"}), 500
+
+    try:
+        from signal_listener import get_win_rate, CHANNEL_WINS, CHANNEL_TOTAL, MIN_WIN_RATE
+        eff_rate, eff_wins, eff_total = get_win_rate()
+        hardcoded = {"wins": CHANNEL_WINS, "total": CHANNEL_TOTAL,
+                     "win_rate": round(CHANNEL_WINS / CHANNEL_TOTAL * 100, 2)}
+        min_wr = MIN_WIN_RATE
+    except Exception:
+        eff_rate, eff_wins, eff_total = 0.0, 0, 0
+        hardcoded, min_wr = {}, 0.70
+
+    recorded   = stats.get("total_trades", 0)
+    TARGET     = 30
+    using_live = recorded >= 5          # get_win_rate switches over at >= 5
+
+    checklist = {
+        "backtest_run":        None,     # informational — run from the Backtest tab
+        "trades_recorded":     recorded,
+        "trades_target":       TARGET,
+        "trades_remaining":    max(0, TARGET - recorded),
+        "using_live_winrate":  using_live,
+        "auto_execute_on":     cfg.AUTO_EXECUTE,
+    }
+
+    return jsonify({
+        "measured":       stats,
+        "hardcoded":      hardcoded,
+        "effective": {
+            "win_rate": round(eff_rate * 100, 2),
+            "wins":     eff_wins,
+            "total":    eff_total,
+            "source":   "live (measured)" if using_live else "hardcoded channel figure",
+        },
+        "min_win_rate_gate": round(min_wr * 100, 2),
+        "checklist":         checklist,
+        "verdict": ("CERTIFIED — live stats driving the filter" if recorded >= TARGET
+                    else f"NOT CERTIFIED — {max(0, TARGET - recorded)} more closed trades needed"),
+    })
 
 
 @app.route("/api/copybot/test", methods=["GET", "POST"])

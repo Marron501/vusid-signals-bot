@@ -11,8 +11,15 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-HISTORY_FILE = Path(__file__).parent / "trade_history.json"
-STATS_FILE = Path(__file__).parent / "trade_stats.json"
+# Volume-backed, but DELIBERATELY separate from the recorder's files.
+# trade_recorder.py owns HISTORY_FILE / STATS_FILE (ground-truth realised PnL
+# from the exchange, read by get_win_rate). The optimizer keeps its own sizing
+# telemetry here so the two never clobber each other — while still persisting
+# to the volume instead of a throwaway container path.
+from paths import DATA_DIR  # noqa: E402
+
+HISTORY_FILE = DATA_DIR / "optimizer_history.json"
+STATS_FILE   = DATA_DIR / "optimizer_stats.json"
 
 
 class TradeOptimizer:
