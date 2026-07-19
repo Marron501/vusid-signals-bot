@@ -47,45 +47,71 @@ def _save(state: dict) -> None:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-def check(current_equity: float, dd_limit: float) -> dict:
+def _migrate(state: dict) -> dict:
     """
-    Evaluate whether trading is allowed right now.
+    Old format was a single flat account state. New format is keyed per account
+    so every executing account gets its own circuit breaker. Migrate in place.
+    """
+    if state and "accounts" not in state:
+        if any(k in state for k in ("date", "start_equity", "tripped")):
+            return {"accounts": {"primary": state}}
+        return {"accounts": {}}
+    if not state:
+        return {"accounts": {}}
+    return state
+
+
+def check(current_equity: float, dd_limit: float, account_key: str = "primary") -> dict:
+    """
+    Evaluate whether trading is allowed right now FOR ONE ACCOUNT.
+
+    Each account carries its own day-start equity and breaker, so a funded
+    account is actually protected rather than being gated on some other
+    account's (possibly empty) balance.
 
     Returns a dict:
         ok            bool  — False means the circuit breaker is active
         tripped       bool  — True once the day's DD limit is breached
         daily_pnl     float — absolute PnL since day start
-        daily_pnl_pct float — fraction of day-start equity (negative = loss)
+        daily_pnl_pct float — % of day-start equity (negative = loss)
         start_equity  float — equity recorded at day start
         date          str   — current UTC date
+        account       str   — which account this applies to
     """
     with _lock:
-        state = _load()
+        root  = _migrate(_load())
+        accts = root.setdefault("accounts", {})
+        acct  = accts.get(account_key, {})
         today = _today()
 
-        # New UTC day → auto-reset
-        if state.get("date") != today:
-            state = {
+        # New UTC day → auto-reset for this account
+        if acct.get("date") != today:
+            acct = {
                 "date":         today,
                 "start_equity": current_equity,
                 "tripped":      False,
                 "manual_reset": False,
             }
-            _save(state)
-            logger.info(f"[RiskGuard] New day ({today}) — start equity ${current_equity:.2f}")
+            accts[account_key] = acct
+            _save(root)
+            logger.info(
+                f"[RiskGuard:{account_key}] New day ({today}) — "
+                f"start equity ${current_equity:.2f}"
+            )
 
-        start_eq      = float(state.get("start_equity") or current_equity or 1)
+        start_eq      = float(acct.get("start_equity") or current_equity or 1)
         daily_pnl     = current_equity - start_eq
         daily_pnl_pct = daily_pnl / start_eq if start_eq > 0 else 0
-        tripped       = state.get("tripped", False)
+        tripped       = acct.get("tripped", False)
 
         # Trip the breaker if loss exceeds limit
         if not tripped and daily_pnl_pct <= -abs(dd_limit):
             tripped = True
-            state["tripped"] = True
-            _save(state)
+            acct["tripped"] = True
+            accts[account_key] = acct
+            _save(root)
             logger.warning(
-                f"[RiskGuard] ⛔ CIRCUIT BREAKER TRIPPED — "
+                f"[RiskGuard:{account_key}] ⛔ CIRCUIT BREAKER TRIPPED — "
                 f"daily PnL {daily_pnl_pct*100:.2f}% / limit -{dd_limit*100:.1f}%"
             )
 
@@ -93,6 +119,7 @@ def check(current_equity: float, dd_limit: float) -> dict:
             "ok":            not tripped,
             "tripped":       tripped,
             "date":          today,
+            "account":       account_key,
             "start_equity":  start_eq,
             "daily_pnl":     round(daily_pnl, 4),
             "daily_pnl_pct": round(daily_pnl_pct * 100, 3),  # stored as %
@@ -100,24 +127,28 @@ def check(current_equity: float, dd_limit: float) -> dict:
         }
 
 
-def manual_reset(new_equity: float | None = None) -> dict:
-    """Reset the circuit breaker manually from the dashboard."""
+def manual_reset(new_equity: float | None = None, account_key: str | None = None) -> dict:
+    """
+    Reset the circuit breaker manually. account_key=None resets every account.
+    """
     with _lock:
-        state = _load()
-        state["tripped"]      = False
-        state["manual_reset"] = True
-        state["date"]         = _today()
-        if new_equity is not None:
-            state["start_equity"] = new_equity
-        _save(state)
-        logger.info(
-            f"[RiskGuard] Circuit breaker manually reset"
-            + (f" — new start equity ${new_equity:.2f}" if new_equity else "")
-        )
-        return state
+        root  = _migrate(_load())
+        accts = root.setdefault("accounts", {})
+        targets = [account_key] if account_key else (list(accts.keys()) or ["primary"])
+        for key in targets:
+            acct = accts.get(key, {})
+            acct["tripped"]      = False
+            acct["manual_reset"] = True
+            acct["date"]         = _today()
+            if new_equity is not None:
+                acct["start_equity"] = new_equity
+            accts[key] = acct
+        _save(root)
+        logger.info(f"[RiskGuard] Circuit breaker manually reset for: {', '.join(targets)}")
+        return root
 
 
 def get_state() -> dict:
-    """Return raw state dict for the dashboard API."""
+    """Return raw state dict for the dashboard API (per-account)."""
     with _lock:
-        return _load()
+        return _migrate(_load())

@@ -1001,13 +1001,16 @@ def api_risk_guard_get():
     except Exception:
         current = 0.0
     import config as _c
-    result = _rg.check(current, _c.DAILY_DD_LIMIT)
+    result = _rg.check(current, _c.DAILY_DD_LIMIT, account_key="primary")
     result["max_positions"]  = _c.MAX_OPEN_POSITIONS
     result["dd_limit_pct"]   = round(_c.DAILY_DD_LIMIT * 100, 1)
     try:
         result["open_positions"] = len(_executor().get_my_positions())
     except Exception:
         result["open_positions"] = 0
+    # Per-account breakers — the extra accounts are the ones actually trading,
+    # so surface their guard state too rather than only the primary's.
+    result["accounts"] = (state or {}).get("accounts", {})
     return jsonify(result)
 
 

@@ -293,11 +293,36 @@ def _broadcast_to_additional_accounts(signal: dict) -> None:
         for acc in active:
             try:
                 ex     = TradeExecutor(api_key=acc["api_key"], api_secret=acc["api_secret"],
-                                       testnet=acc.get("testnet", False))
+                                       testnet=acc.get("testnet", False),
+                                       demo=acc.get("demo", False))
                 lev    = Decimal(str(acc.get("leverage", config.DEFAULT_LEVERAGE)))
                 equity = ex.get_equity()
                 eq_f   = float(equity)
                 name   = acc.get("name", acc["id"])
+
+                # ── Risk Guard, evaluated against THIS account ─────────────────
+                # Previously the breaker and position cap were only checked
+                # against the primary account, so a funded extra account traded
+                # completely unguarded. Each account now gates on its own equity
+                # and its own open positions.
+                import risk_guard as _rg_acc
+                _g = _rg_acc.check(eq_f, config.DAILY_DD_LIMIT, account_key=acc["id"])
+                if not _g["ok"]:
+                    logger.warning(
+                        f"[multi-account] {name}: BLOCKED — circuit breaker "
+                        f"(daily {_g['daily_pnl_pct']:.2f}% / limit -{_g['dd_limit_pct']:.1f}%)"
+                    )
+                    continue
+                try:
+                    _acc_open = len(ex.get_my_positions())
+                except Exception:
+                    _acc_open = 0
+                if _acc_open >= config.MAX_OPEN_POSITIONS:
+                    logger.warning(
+                        f"[multi-account] {name}: BLOCKED — max positions "
+                        f"({_acc_open}/{config.MAX_OPEN_POSITIONS})"
+                    )
+                    continue
 
                 # ── Phase-based risk (same strategy applied per-account equity) ──
                 base_risk = config.RISK_PCT
@@ -369,7 +394,8 @@ def _broadcast_close_to_additional_accounts(signal: dict) -> None:
                 continue
             try:
                 ex   = TradeExecutor(api_key=acc["api_key"], api_secret=acc["api_secret"],
-                                     testnet=acc.get("testnet", False))
+                                     testnet=acc.get("testnet", False),
+                                     demo=acc.get("demo", False))
                 name = acc.get("name", acc["id"])
                 if signal["action"] == "close_all":
                     positions = ex.get_my_positions()
