@@ -390,6 +390,68 @@ def api_momentum_alerts():
     return jsonify(_momentum_alerts[:20])
 
 
+_kline_cache: dict = {}
+
+@app.route("/api/klines")
+def api_klines():
+    """
+    OHLCV candles for the trading terminal chart. Public Bybit endpoint —
+    no credentials needed, so the chart works even with no account connected.
+    Cached 20s per symbol/interval to stay well inside rate limits.
+    """
+    symbol   = (request.args.get("symbol", "BTCUSDT") or "BTCUSDT").upper()
+    interval = request.args.get("interval", "15")
+    limit    = min(int(request.args.get("limit", 200)), 500)
+    key      = f"{symbol}_{interval}_{limit}"
+    now      = time.time()
+
+    hit = _kline_cache.get(key)
+    if hit and now - hit["ts"] < 20:
+        return jsonify(hit["data"])
+
+    try:
+        r = requests.get(
+            "https://api.bybit.com/v5/market/kline",
+            params={"category": "linear", "symbol": symbol,
+                    "interval": interval, "limit": limit},
+            timeout=10,
+        )
+        j = r.json()
+        rows = (j.get("result") or {}).get("list") or []
+        # Bybit returns newest-first: [start, open, high, low, close, volume, turnover]
+        candles = []
+        for row in reversed(rows):
+            try:
+                candles.append({
+                    "t": int(row[0]), "o": float(row[1]), "h": float(row[2]),
+                    "l": float(row[3]), "c": float(row[4]), "v": float(row[5]),
+                })
+            except Exception:
+                continue
+        # Live ticker for the header stats
+        stats = {}
+        try:
+            tk = requests.get("https://api.bybit.com/v5/market/tickers",
+                              params={"category": "linear", "symbol": symbol}, timeout=8).json()
+            t0 = ((tk.get("result") or {}).get("list") or [{}])[0]
+            stats = {
+                "last":   float(t0.get("lastPrice") or 0),
+                "chg_pct": float(t0.get("price24hPcnt") or 0) * 100,
+                "high":   float(t0.get("highPrice24h") or 0),
+                "low":    float(t0.get("lowPrice24h") or 0),
+                "vol":    float(t0.get("volume24h") or 0),
+                "turnover": float(t0.get("turnover24h") or 0),
+            }
+        except Exception:
+            pass
+
+        data = {"symbol": symbol, "interval": interval, "candles": candles, "stats": stats}
+        _kline_cache[key] = {"ts": now, "data": data}
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"symbol": symbol, "candles": [], "stats": {}, "error": str(e)})
+
+
 @app.route("/api/momentum-alerts/clear", methods=["POST"])
 def api_momentum_alerts_clear():
     """Dismiss all momentum alerts."""
@@ -1643,6 +1705,42 @@ select.inp option{background:var(--card);color:var(--text)}
   display:inline-flex;align-items:center}
 .fpill.active{background:var(--accentbg);color:var(--accent2);border-color:var(--accentbrd)}
 
+/* ── TRADING TERMINAL (chart) ─────────────────────────── */
+.tt-wrap{background:linear-gradient(180deg,#0c1226,#070b16);border:1px solid #1b2742;
+  border-radius:14px;overflow:hidden;box-shadow:0 10px 34px rgba(0,0,0,.45)}
+.tt-head{display:flex;align-items:center;gap:10px;padding:10px 12px;flex-wrap:wrap;
+  background:linear-gradient(180deg,#141d38,#0d1428);border-bottom:1px solid #1b2742}
+.tt-sym{font-family:var(--font-mono);font-size:15px;font-weight:800;color:#eaf2ff;letter-spacing:.02em}
+.tt-price{font-family:var(--font-mono);font-size:15px;font-weight:800}
+.tt-chg{font-family:var(--font-mono);font-size:11px;font-weight:800;padding:2px 7px;border-radius:5px}
+.tt-chg.up{color:#34d399;background:rgba(52,211,153,.12)}
+.tt-chg.dn{color:#f87171;background:rgba(248,113,113,.12)}
+.tt-stats{display:flex;gap:14px;margin-left:auto;flex-wrap:wrap}
+.tt-stat{font-family:var(--font-mono);font-size:9.5px;color:#56648a;white-space:nowrap}
+.tt-stat b{display:block;color:#c3d0ec;font-size:11px;font-weight:700;margin-top:1px}
+.tt-controls{display:flex;gap:6px;padding:8px 10px;border-bottom:1px solid #141d36;
+  background:#0a0f1f;overflow-x:auto;scrollbar-width:none;align-items:center}
+.tt-controls::-webkit-scrollbar{display:none}
+.tt-sel{background:#0e1730;border:1px solid #1b2742;color:#c3d0ec;border-radius:7px;
+  padding:6px 9px;font-size:11px;font-weight:700;font-family:var(--font-mono);cursor:pointer;outline:none}
+.tt-tf{display:flex;gap:3px}
+.tt-tf button{background:none;border:1px solid transparent;color:#566489;border-radius:6px;
+  padding:5px 9px;font-size:10px;font-weight:800;font-family:var(--font-mono);cursor:pointer;
+  transition:all .15s;min-width:34px}
+.tt-tf button:hover{color:#9fb0d0}
+.tt-tf button.active{color:#22d3ee;background:rgba(34,211,238,.1);border-color:rgba(34,211,238,.35)}
+.tt-chart{position:relative;background:
+  repeating-linear-gradient(0deg,transparent 0 39px,rgba(255,255,255,.02) 39px 40px),#070b16;
+  touch-action:pan-y}
+.tt-chart svg{display:block;width:100%;height:auto}
+.tt-cross-lbl{font-family:var(--font-mono);font-size:9px;fill:#eaf2ff}
+.tt-axis{font-family:var(--font-mono);font-size:9px;fill:#56648a}
+.tt-legend{display:flex;gap:12px;padding:7px 12px;border-top:1px solid #141d36;background:#0a0f1f;
+  font-family:var(--font-mono);font-size:9.5px;color:#56648a;flex-wrap:wrap}
+.tt-legend b{color:#c3d0ec;font-weight:700}
+.tt-ohlc{display:flex;gap:10px;font-family:var(--font-mono);font-size:10px;flex-wrap:wrap}
+.tt-ohlc span{color:#56648a}.tt-ohlc i{font-style:normal;font-weight:700}
+
 /* ── LOG TERMINAL ─────────────────────────────────────── */
 /* Professional dark trading-console. The .page scrolls (no nested scroll); the
    panel flows. Self-contained dark palette so it reads as a real terminal
@@ -2664,7 +2762,55 @@ select.inp option{background:var(--card);color:var(--text)}
   </button>
 </div></div>
 
-<!-- ⑥ LOGS -->
+<!-- ⑥ CHART / TRADING TERMINAL -->
+<div class="page" id="page-chart"><div class="pad">
+  <div class="tt-wrap">
+    <div class="tt-head">
+      <span class="tt-sym" id="tt-sym">BTCUSDT</span>
+      <span class="tt-price" id="tt-price">—</span>
+      <span class="tt-chg" id="tt-chg">—</span>
+      <div class="tt-stats">
+        <div class="tt-stat">24H HIGH<b id="tt-high">—</b></div>
+        <div class="tt-stat">24H LOW<b id="tt-low">—</b></div>
+        <div class="tt-stat">24H VOL<b id="tt-vol">—</b></div>
+      </div>
+    </div>
+    <div class="tt-controls">
+      <select class="tt-sel" id="tt-symsel" onchange="ttSetSymbol(this.value)"></select>
+      <div class="tt-tf" id="tt-tf">
+        <button onclick="ttSetTf('5',this)">5m</button>
+        <button onclick="ttSetTf('15',this)" class="active">15m</button>
+        <button onclick="ttSetTf('60',this)">1H</button>
+        <button onclick="ttSetTf('240',this)">4H</button>
+        <button onclick="ttSetTf('D',this)">1D</button>
+      </div>
+      <button class="tt-sel" id="tt-refresh" onclick="ttLoad(true)" style="margin-left:auto">↺</button>
+    </div>
+    <div class="tt-chart" id="tt-chart">
+      <svg id="tt-svg" viewBox="0 0 760 380" preserveAspectRatio="none"></svg>
+    </div>
+    <div class="tt-legend">
+      <div class="tt-ohlc" id="tt-ohlc">
+        <span>O <i id="tt-o">—</i></span><span>H <i id="tt-h">—</i></span>
+        <span>L <i id="tt-l">—</i></span><span>C <i id="tt-c">—</i></span>
+      </div>
+      <div style="margin-left:auto">EMA<b id="tt-ema-lbl" style="color:#22d3ee"> 20</b> ·
+        EMA<b id="tt-ema2-lbl" style="color:#fbbf24"> 50</b></div>
+    </div>
+  </div>
+
+  <div class="card mb" style="margin-top:12px">
+    <div class="card-label">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+      Live Market
+    </div>
+    <div id="tt-watch" style="font-family:var(--font-mono);font-size:11px">
+      <div style="color:var(--text3);padding:10px 0">Loading market…</div>
+    </div>
+  </div>
+</div></div>
+
+<!-- ⑦ LOGS -->
 <div class="page" id="page-logs"><div class="pad">
   <div class="term">
     <div class="term-bar">
@@ -2824,6 +2970,10 @@ select.inp option{background:var(--card);color:var(--text)}
   <button class="nav-btn" id="nav-settings" onclick="goTab('settings')">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="3" stroke-linecap="round" stroke-linejoin="round"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
     <span>Settings</span><span class="tab-line"></span>
+  </button>
+  <button class="nav-btn" id="nav-chart" onclick="goTab('chart')">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 3v18h18M7 15l3-4 3 3 5-7"/></svg>
+    <span>Chart</span><span class="tab-line"></span>
   </button>
   <button class="nav-btn" id="nav-logs" onclick="goTab('logs')">
     <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 10h16M4 14h16M4 18h16"/></svg>
@@ -3277,6 +3427,7 @@ function goTab(tab) {
   }
   if (tab === 'positions') fetchPositions();
   if (tab === 'logs') renderLogs(logFilter);
+  if (tab === 'chart') { try { ttActivate(); } catch(e){ console.error('[chart]', e); } }
   if (tab === 'settings') renderAcctControls();
 }
 
@@ -5890,6 +6041,194 @@ function _drawEquityCurve(curve, startEq) {
   if (endEl)   endEl.textContent   = '$' + last.toLocaleString('en',{minimumFractionDigits:0,maximumFractionDigits:0});
   // Colour line by outcome
   if (lineEl) lineEl.setAttribute('stroke', last >= (startEq||0) ? 'var(--green)' : 'var(--red)');
+}
+
+/* ── TRADING TERMINAL — candlestick chart engine ─────────────────────────── */
+let _ttSymbol = localStorage.getItem('ttSymbol') || 'BTCUSDT';
+let _ttTf     = localStorage.getItem('ttTf') || '15';
+let _ttData   = null;
+let _ttTimer  = null;
+
+function _ttFmt(n, dp) {
+  if (n === null || n === undefined || isNaN(n)) return '—';
+  if (dp === undefined) dp = n >= 1000 ? 2 : n >= 1 ? 4 : 6;
+  return Number(n).toLocaleString('en-US', {minimumFractionDigits:dp, maximumFractionDigits:dp});
+}
+function _ttCompact(n) {
+  if (!n) return '—';
+  if (n >= 1e9) return (n/1e9).toFixed(2)+'B';
+  if (n >= 1e6) return (n/1e6).toFixed(2)+'M';
+  if (n >= 1e3) return (n/1e3).toFixed(1)+'K';
+  return n.toFixed(2);
+}
+function _ema(vals, period) {
+  const k = 2/(period+1); const out = []; let prev;
+  vals.forEach((v,i) => {
+    if (i === 0) { prev = v; out.push(v); return; }
+    prev = v*k + prev*(1-k); out.push(prev);
+  });
+  return out;
+}
+
+function ttSetSymbol(sym){ _ttSymbol = sym; localStorage.setItem('ttSymbol', sym); ttLoad(true); }
+function ttSetTf(tf, el){
+  _ttTf = tf; localStorage.setItem('ttTf', tf);
+  document.querySelectorAll('#tt-tf button').forEach(b=>b.classList.remove('active'));
+  if (el) el.classList.add('active');
+  ttLoad(true);
+}
+
+async function ttLoad(userInitiated){
+  const btn = document.getElementById('tt-refresh');
+  if (userInitiated && btn) { btn.disabled = true; btn.textContent='…'; }
+  try {
+    const r = await fetch(`/api/klines?symbol=${encodeURIComponent(_ttSymbol)}&interval=${_ttTf}&limit=200`,
+                          {cache:'no-store'});
+    const d = await r.json();
+    if (!d.candles || !d.candles.length) { if(userInitiated) toast('No chart data', false); return; }
+    _ttData = d;
+    ttRender();
+  } catch(e){ if (userInitiated) toast('❌ Chart load failed', false); }
+  finally { if (userInitiated && btn) { btn.disabled=false; btn.textContent='↺'; } }
+}
+
+function ttRender(){
+  const d = _ttData; if (!d) return;
+  const c = d.candles; const svg = document.getElementById('tt-svg'); if (!svg) return;
+
+  // Header
+  const st = d.stats || {};
+  const last = st.last || (c.length ? c[c.length-1].c : 0);
+  document.getElementById('tt-sym').textContent   = d.symbol;
+  document.getElementById('tt-price').textContent = _ttFmt(last);
+  const chg = st.chg_pct || 0;
+  const ce  = document.getElementById('tt-chg');
+  ce.textContent = (chg>=0?'+':'') + chg.toFixed(2) + '%';
+  ce.className   = 'tt-chg ' + (chg>=0?'up':'dn');
+  document.getElementById('tt-price').style.color = chg>=0 ? '#34d399' : '#f87171';
+  document.getElementById('tt-high').textContent = _ttFmt(st.high);
+  document.getElementById('tt-low').textContent  = _ttFmt(st.low);
+  document.getElementById('tt-vol').textContent  = _ttCompact(st.turnover||st.vol);
+
+  // Geometry
+  const W=760, H=380, padL=8, padR=62, padT=10, volH=54, gap=8;
+  const priceH = H - volH - gap - padT - 18;
+  const n = c.length, cw = (W-padL-padR)/n, bw = Math.max(1.2, cw*0.62);
+  const hi = Math.max(...c.map(x=>x.h)), lo = Math.min(...c.map(x=>x.l));
+  const range = (hi-lo)||1, pad = range*0.06;
+  const yTop = hi+pad, yBot = lo-pad, yRange = yTop-yBot;
+  const Y = p => padT + (yTop-p)/yRange*priceH;
+  const X = i => padL + i*cw + cw/2;
+  const maxVol = Math.max(...c.map(x=>x.v))||1;
+  const VY = v => padT+priceH+gap+volH - (v/maxVol)*volH;
+
+  const closes = c.map(x=>x.c);
+  const e20 = _ema(closes,20), e50 = _ema(closes,50);
+  const path = (arr) => arr.map((v,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join('');
+
+  let s = '';
+  // horizontal grid + price axis
+  for (let g=0; g<=4; g++){
+    const y = padT + (priceH/4)*g;
+    const p = yTop - (yRange/4)*g;
+    s += `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W-padR}" y2="${y.toFixed(1)}" stroke="rgba(120,150,210,.10)" stroke-width="1"/>`;
+    s += `<text class="tt-axis" x="${W-padR+5}" y="${(y+3).toFixed(1)}">${_ttFmt(p)}</text>`;
+  }
+  // volume bars
+  c.forEach((k,i)=>{
+    const up = k.c>=k.o;
+    s += `<rect x="${(X(i)-bw/2).toFixed(1)}" y="${VY(k.v).toFixed(1)}" width="${bw.toFixed(1)}" `+
+         `height="${(padT+priceH+gap+volH-VY(k.v)).toFixed(1)}" fill="${up?'rgba(52,211,153,.30)':'rgba(248,113,113,.30)'}"/>`;
+  });
+  // candles
+  c.forEach((k,i)=>{
+    const up = k.c>=k.o, col = up?'#34d399':'#f87171', x=X(i);
+    const yO=Y(k.o), yC=Y(k.c), top=Math.min(yO,yC), h=Math.max(1,Math.abs(yC-yO));
+    s += `<line x1="${x.toFixed(1)}" y1="${Y(k.h).toFixed(1)}" x2="${x.toFixed(1)}" y2="${Y(k.l).toFixed(1)}" stroke="${col}" stroke-width="1"/>`;
+    s += `<rect x="${(x-bw/2).toFixed(1)}" y="${top.toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" fill="${col}"/>`;
+  });
+  // EMAs
+  s += `<path d="${path(e20)}" fill="none" stroke="#22d3ee" stroke-width="1.4" opacity=".95"/>`;
+  s += `<path d="${path(e50)}" fill="none" stroke="#fbbf24" stroke-width="1.4" opacity=".9"/>`;
+  // last price line
+  const lastY = Y(closes[closes.length-1]);
+  s += `<line x1="${padL}" y1="${lastY.toFixed(1)}" x2="${W-padR}" y2="${lastY.toFixed(1)}" stroke="${chg>=0?'#34d399':'#f87171'}" stroke-width="1" stroke-dasharray="3 3" opacity=".7"/>`;
+  s += `<rect x="${W-padR+1}" y="${(lastY-8).toFixed(1)}" width="${padR-3}" height="16" rx="3" fill="${chg>=0?'#34d399':'#f87171'}"/>`;
+  s += `<text x="${W-padR+5}" y="${(lastY+4).toFixed(1)}" font-family="var(--font-mono)" font-size="9.5" font-weight="700" fill="#04141a">${_ttFmt(last)}</text>`;
+  // crosshair holder
+  s += `<g id="tt-cross" style="display:none"><line id="tt-cx" y1="${padT}" y2="${padT+priceH}" stroke="rgba(195,208,236,.45)" stroke-width="1" stroke-dasharray="3 3"/></g>`;
+
+  svg.innerHTML = s;
+  ttOhlc(c[c.length-1]);
+
+  // Crosshair / scrub
+  const chart = document.getElementById('tt-chart');
+  chart.onmousemove = chart.ontouchmove = ev => {
+    const rect = svg.getBoundingClientRect();
+    const cx = (ev.touches? ev.touches[0].clientX : ev.clientX) - rect.left;
+    const i = Math.max(0, Math.min(n-1, Math.round((cx/rect.width*W - padL - cw/2)/cw)));
+    ttOhlc(c[i]);
+    const g = document.getElementById('tt-cross'), ln = document.getElementById('tt-cx');
+    if (g && ln){ g.style.display=''; ln.setAttribute('x1', X(i)); ln.setAttribute('x2', X(i)); }
+  };
+  chart.onmouseleave = () => {
+    ttOhlc(c[c.length-1]);
+    const g = document.getElementById('tt-cross'); if (g) g.style.display='none';
+  };
+}
+
+function ttOhlc(k){
+  if (!k) return;
+  const up = k.c>=k.o, col = up?'#34d399':'#f87171';
+  const set=(id,v)=>{const e=document.getElementById(id); if(e){e.textContent=_ttFmt(v); e.style.color=col;}};
+  set('tt-o',k.o); set('tt-h',k.h); set('tt-l',k.l); set('tt-c',k.c);
+}
+
+/* Symbol list — from live market movers, with sensible majors as fallback */
+async function ttPopulateSymbols(){
+  const sel = document.getElementById('tt-symsel'); if (!sel || sel.options.length) return;
+  let syms = ['BTCUSDT','ETHUSDT','SOLUSDT','XRPUSDT','BNBUSDT','DOGEUSDT','ADAUSDT','LINKUSDT'];
+  try {
+    const m = await fetch('/api/market-ticker').then(r=>r.json());
+    // /api/market-ticker strips the USDT suffix — restore it for kline lookups
+    const live = [...(m.gainers||[]),...(m.losers||[])]
+      .map(x=>x.symbol).filter(Boolean)
+      .map(s=>s.endsWith('USDT')?s:s+'USDT');
+    syms = [...new Set([...syms, ...live])];
+  } catch(e){}
+  if (!syms.includes(_ttSymbol)) syms.unshift(_ttSymbol);
+  sel.innerHTML = syms.map(s=>`<option value="${s}" ${s===_ttSymbol?'selected':''}>${s}</option>`).join('');
+}
+
+/* Watchlist under the chart */
+async function ttWatchlist(){
+  const el = document.getElementById('tt-watch'); if (!el) return;
+  try {
+    const m = await fetch('/api/market-ticker').then(r=>r.json());
+    const rows = [...(m.gainers||[]).slice(0,5), ...(m.losers||[]).slice(0,5)];
+    if (!rows.length){ el.innerHTML='<div style="color:var(--text3);padding:10px 0">No market data</div>'; return; }
+    el.innerHTML = rows.map(r=>{
+      const ch = Number(r.change||r.chg||0);
+      const col = ch>=0?'var(--green)':'var(--red)';
+      const full = (r.symbol||'').endsWith('USDT') ? r.symbol : (r.symbol||'')+'USDT';
+      return `<div onclick="ttSetSymbol('${full}')" style="display:flex;align-items:center;gap:8px;
+        padding:7px 0;border-bottom:1px solid var(--border);cursor:pointer">
+        <span style="font-weight:700;width:96px">${(r.symbol||'').replace('USDT','')}</span>
+        <span style="color:var(--text2)">${_ttFmt(Number(r.price||r.last||0))}</span>
+        <span style="margin-left:auto;color:${col};font-weight:800">${ch>=0?'+':''}${ch.toFixed(2)}%</span>
+      </div>`;
+    }).join('');
+  } catch(e){ el.innerHTML='<div style="color:var(--text3);padding:10px 0">Market unavailable</div>'; }
+}
+
+function ttActivate(){
+  ttPopulateSymbols().then(ttLoad);
+  ttWatchlist();
+  document.querySelectorAll('#tt-tf button').forEach(b=>{
+    b.classList.toggle('active', b.getAttribute('onclick').includes(`'${_ttTf}'`));
+  });
+  clearInterval(_ttTimer);
+  _ttTimer = setInterval(()=>{ if (activeTab==='chart') { ttLoad(); ttWatchlist(); } }, 30000);
 }
 
 /* ── Terminal cosmetics — design-only, additive (no existing fn modified) ── */
