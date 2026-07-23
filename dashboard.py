@@ -370,7 +370,34 @@ def api_signals():
 
 @app.route("/api/momentum-alerts", methods=["GET"])
 def api_momentum_alerts():
+    """
+    Live momentum alerts. Stale alerts (positions already closed, or older than
+    MOMENTUM_ALERT_TTL_MIN) are pruned so 'Refresh' clears resolved warnings
+    instead of showing them forever.
+    """
+    global _momentum_alerts
+    ttl_min = 90
+    now = datetime.now()
+    fresh = []
+    for a in _momentum_alerts:
+        try:
+            age_min = (now - datetime.fromisoformat(a.get("ts", ""))).total_seconds() / 60.0
+        except Exception:
+            age_min = 0
+        if age_min <= ttl_min:
+            fresh.append(a)
+    _momentum_alerts = fresh
     return jsonify(_momentum_alerts[:20])
+
+
+@app.route("/api/momentum-alerts/clear", methods=["POST"])
+def api_momentum_alerts_clear():
+    """Dismiss all momentum alerts."""
+    global _momentum_alerts
+    n = len(_momentum_alerts)
+    _momentum_alerts = []
+    _momentum_checked.clear()   # allow immediate re-evaluation
+    return jsonify({"success": True, "cleared": n})
 
 
 @app.route("/api/certification", methods=["GET"])
@@ -2317,7 +2344,10 @@ select.inp option{background:var(--card);color:var(--text)}
       Momentum Alerts
       <span id="home-mo-dot" class="nav-dot" style="display:none"></span>
     </div>
-    <button class="btn btn-ghost btn-sm" onclick="loadMomentumAlerts()" style="width:auto;padding:5px 10px;font-size:10px">Refresh ↺</button>
+    <div style="display:flex;gap:6px">
+      <button class="btn btn-ghost btn-sm" onclick="clearMomentumAlerts()" style="width:auto;padding:5px 10px;font-size:10px">Clear</button>
+      <button class="btn btn-ghost btn-sm" id="mo-refresh-btn" onclick="loadMomentumAlerts(true)" style="width:auto;padding:5px 10px;font-size:10px">Refresh ↺</button>
+    </div>
   </div>
   <div id="home-momentum-alerts">
     <div style="text-align:center;padding:16px;color:var(--text3);font-size:12px">No alerts — positions momentum is stable</div>
@@ -3342,9 +3372,17 @@ function render() {
   document.getElementById('dot').className = 'dot ' + (on ? 'dot-on' : 'dot-off');
   document.getElementById('status-txt').textContent = on ? 'Online' : 'Offline';
 
+  // Primary account snapshot — declared at function scope because everything
+  // below (positions, accounts page, phase) depends on it. It was previously
+  // const-scoped inside the if-block, so line "acc.equity" threw a
+  // ReferenceError that aborted render() and left Logs/Signals/Positions blank.
+  const acc  = {...(d.account || {}),
+                unrealised_pnl: (d.account && (d.account.unrealised_pnl || d.account.total_pnl)) || 0};
+  if (typeof acc.equity !== 'number') acc.equity = Number(acc.equity) || 0;
+  const upnl = Number(acc.unrealised_pnl) || 0;
+
   // Balance — show whichever account is selected
   if (_dashAccId === 'primary') {
-    const acc = {...d.account, unrealised_pnl: d.account.unrealised_pnl || d.account.total_pnl || 0};
     _applyHeroBalance(acc, d.equity_fraction, d.default_leverage, d.timestamp);
   } else {
     renderHeroForAcc(_dashAccId);  // async, shows cached or fetches
@@ -3399,15 +3437,20 @@ function render() {
   document.getElementById('pa-eq-pill').textContent  = (d.equity_fraction*100).toFixed(0) + '% equity';
   document.getElementById('pa-lev-pill').textContent = d.default_leverage + '× leverage';
 
-  renderPositions(acc);
-  renderHistory(d.history || []);
-  renderSignals();
-  renderHomeAI();
-  renderPhase(d, acc.equity || 0);
+  // Each section is isolated: a failure in one must never blank the rest.
+  const _safe = (name, fn) => { try { fn(); } catch (e) { console.error('[render] ' + name, e); } };
+  _safe('positions', () => renderPositions(acc));
+  _safe('history',   () => renderHistory(d.history || []));
+  _safe('signals',   () => renderSignals());
+  _safe('homeAI',    () => renderHomeAI());
+  _safe('phase',     () => renderPhase(d, acc.equity || 0));
 
-  allLogs = d.logs || [];
-  document.getElementById('log-count').textContent = allLogs.length;
-  if (activeTab === 'logs') renderLogs(logFilter);
+  _safe('logs', () => {
+    allLogs = d.logs || [];
+    const lc = document.getElementById('log-count');
+    if (lc) lc.textContent = allLogs.length;
+    renderLogs(logFilter);   // always render so the tab is populated when opened
+  });
 }
 
 /* ── Positions ───────────────────────────────────────── */
@@ -4311,12 +4354,34 @@ function renderMomentumAlerts() {
     </div>`;
   }).join('');
 }
-async function loadMomentumAlerts() {
+async function loadMomentumAlerts(userInitiated) {
+  const btn = document.getElementById('mo-refresh-btn');
+  if (userInitiated && btn) { btn.disabled = true; btn.textContent = '…'; }
   try {
-    const r = await fetch('/api/momentum-alerts');
+    // Server prunes stale/expired alerts on GET, so refresh genuinely clears
+    // warnings for positions that have since resolved.
+    const r = await fetch('/api/momentum-alerts', {cache: 'no-store'});
     _momentumAlerts = await r.json();
     renderMomentumAlerts();
-  } catch(e) {}
+    if (userInitiated) toast(_momentumAlerts.length
+      ? `${_momentumAlerts.length} active alert${_momentumAlerts.length>1?'s':''}`
+      : '✅ No active momentum alerts', true);
+  } catch(e) {
+    if (userInitiated) toast('❌ Could not refresh alerts', false);
+  } finally {
+    if (userInitiated && btn) { btn.disabled = false; btn.textContent = 'Refresh ↺'; }
+  }
+}
+
+async function clearMomentumAlerts() {
+  try {
+    await fetch('/api/momentum-alerts/clear', {method:'POST'});
+    _momentumAlerts = [];
+    renderMomentumAlerts();
+    const dot = document.getElementById('home-mo-dot');
+    if (dot) dot.style.display = 'none';
+    toast('✅ Alerts cleared', true);
+  } catch(e) { toast('❌ Clear failed', false); }
 }
 async function manualCloseAlert(symbol, side) {
   if (!confirm(`Close ${side === 'Buy' ? 'LONG' : 'SHORT'} ${symbol}?`)) return;
